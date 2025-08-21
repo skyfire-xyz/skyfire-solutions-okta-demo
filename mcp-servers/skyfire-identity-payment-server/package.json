@@ -1,5 +1,5 @@
 {
-  "name": "skyfire-solutions-okta-demo-identity-payment-mcp-server",
+  "name": "skyfire-solutions-okta-identity-payment-mcp-server",
   "version": "0.0.0",
   "private": true,
   "scripts": {
