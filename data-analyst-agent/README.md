@@ -19,10 +19,12 @@ This demo agent is available [here](https://data-analyst-agent-okta-demo-7446436
 
 1.  Install dependencies:
     ```bash
-    npm install
+    yarn install
     ```
 2. Setup OpenAI account and get API key for LLM
-3. Set up environment variables:
+3. Setup Skyfire account using [Skyfire Platform Setup Guide](https://docs.skyfire.xyz/docs/introduction) and get the buyer agent API key
+4. Run the MCP servers locally to get their URLs
+5. Set up environment variables:
     Create a `.env` file in the root directory. You can copy `.env.example` if one exists, or add the necessary variables manually.
 
     ```
@@ -39,7 +41,7 @@ This demo agent is available [here](https://data-analyst-agent-okta-demo-7446436
 Run the development server:
 
 ```bash
-npm run dev
+yarn dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.

@@ -67,7 +67,7 @@ Setting up Google Apps Script is only required for the flow wherein a presentati
 
     ```
     # .dev.vars
-    DEPLOYED_GOOGLE_APPS_SCRIPT_URL=your_google_apps_script_deployment_url
+    DEPLOYED_GOOGLE_APPS_SCRIPT_URL=<your_google_apps_script_deployment_url>
     ```
 
 ## Run the development server:

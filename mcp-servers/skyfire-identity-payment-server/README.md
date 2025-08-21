@@ -27,9 +27,9 @@ For this demo, Skyfire works a directory of services from which the CarbonArc MC
 
     ```
     # .env
-    CARBONARC_SELLER_SERVICE_ID=your_seller_service_id
+    CARBONARC_SELLER_SERVICE_ID=<your_seller_service_id>
     SKYFIRE_API_BASE_URL=https://api.skyfire.xyz
-    CARBONARC_MCP_SERVER_URL=your_local_carbonarc_mcp_server_url
+    CARBONARC_MCP_SERVER_URL=<your_local_carbonarc_mcp_server_url>
     ```
 
 ## Run the development server:

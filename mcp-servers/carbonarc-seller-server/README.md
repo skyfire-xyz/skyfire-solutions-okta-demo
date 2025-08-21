@@ -9,16 +9,15 @@ This MCP Server has four tools -
 
 ## Getting Started
 
-- Set up an Ory account: 
-Ory is the default CIAM being used in this demo. Take a look at our [partnership with Ory](https://www.ory.sh/blog/enabling-the-agentic-economy-with-ory-and-skyfire) integrating KYAPay with CIAMs to secure the CarbonArc MCP server (the seller of the data).
-[Blog](https://www.ory.sh/blog/agentic-ai-security-mcp-oauth) to refer for more details on Ory + MCP integration.
+- Set up an Auth0 account: 
+Auth0 is the default CIAM being used in this demo.
 
-Steps to be followed for setting up Ory:
-1. Visit the [Ory Console](https://console.ory.sh)
-2. Create a new workspace
-3. Create a project in the new workspace
-4. Use the Project ID, Project Slug, API endpoints etc details from Project Settings tab in env variables.
-
+Steps to be followed for setting up Auth0:
+1. Visit the [Auth0 Dashboard](https://manage.auth0.com/dashboard/)
+2. Create a new tenant
+3. Follow the [Auth0 official documentation for creating a new custom token exchange profile](https://auth0.com/docs/authenticate/custom-token-exchange)
+4. [Sample code for creating Auth0 Action](https://github.com/skyfire-xyz/skyfire-solutions-okta-demo/tree/main/auth0/sample-action-code.ts).
+   
 ## Installation
 
 1.  Install dependencies:
@@ -26,19 +25,23 @@ Steps to be followed for setting up Ory:
     npm install
     ```
 2. Follow the [Skyfire Platform Setup Guide](https://docs.skyfire.xyz/docs/introduction) to create seller account and seller services.
-3. Git clone Ory MCP repo from [here](https://github.com/ory/mcp) and use npm link to tie [mcp-access-control](https://github.com/ory/mcp/tree/main/packages/mcp-access-control) package with this server. This will be a npm package in a few days.
+3. Use the Auth0 Client ID, Client Secret, Domain etc details from Settings tab of your newly created Application in env variables in [CarbonArc MCP Server](https://github.com/skyfire-xyz/skyfire-solutions-okta-demo/tree/main/mcp-servers/carbonarc-seller-server).
 4. Set up environment variables:
     Create a `.dev.vars` file in the root directory. You can copy `.dev.vars.example` if one exists, or add the necessary variables manually.
 
     ```
     # .dev.vars
-    CARBONARC_SELLER_SERVICE_ID=your_seller_service_id
+    CARBONARC_SELLER_SERVICE_ID=<your_seller_service_id>
     JWKS_URL=https://api.skyfire.xyz/.well-known/jwks.json
-    ORY_API_KEY=your_ory_api_key
-    ORY_PROJECT_ID=your_ory_project_slug
-    SKYFIRE_API_KEY=your_carbonarc_seller_api_key
+    SKYFIRE_API_KEY=<your_carbonarc_seller_api_key>
     JWT_ISSUER=https://app.skyfire.xyz
     SKYFIRE_API_BASE_URL=https://api.skyfire.xyz
+    AUTH0_AUDIENCE=<your_auth0_api_audience>
+    AUTH0_CLIENT_ID=<your_auth0_application_client_id>
+    AUTH0_CLIENT_SECRET=<your_auth0_application_client_secret>
+    AUTH0_GRANT_TYPE=urn:ietf:params:oauth:grant-type:token-exchange
+    AUTH0_SUBJECT_TOKEN_TYPE=<your_custom_token_exchange_profile_subject_token_type>
+    AUTH0_URL=<your_auth0_application_domain>/oauth/token
     ```
 
 ## Run the development server:

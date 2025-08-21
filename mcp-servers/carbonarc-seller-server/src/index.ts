@@ -3,7 +3,6 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { Hono } from "hono";
 import { env } from "cloudflare:workers";
-// import { McpAccessControl } from "@ory/mcp-access-control";
 
 type Bindings = Env;
 
@@ -13,9 +12,6 @@ const app = new Hono<{
 
 type State = null;
 
-const accountId = env.ACCOUNT_ID;
-const accessKeyId = env.ACCESS_KEY_ID;
-const secretAccessKey = env.SECRET_ACCESS_KEY;
 const skyfireSellerApiKey = env.SKYFIRE_API_KEY;
 const auth0Url = env.AUTH0_URL; 
 const auth0GrantType = env.AUTH0_GRANT_TYPE; 
@@ -23,23 +19,7 @@ const auth0SubjectTokenType = env.AUTH0_SUBJECT_TOKEN_TYPE;
 const auth0Audience = env.AUTH0_AUDIENCE; 
 const auth0ClientId = env.AUTH0_CLIENT_ID;
 const auth0ClientSecret = env.AUTH0_CLIENT_SECRET; 
-// const oryApiKey = env.ORY_API_KEY;
-// const oryProjectId = env.ORY_PROJECT_ID;
-const jwksUrl = env.JWKS_URL;
 let resToken: string;
-
-// // Initialize Ory access control
-// const accessControl = new McpAccessControl({
-//   jwksUrl: jwksUrl,
-//   issuer: env.JWT_ISSUER,
-//   audience: env.CARBONARC_SELLER_ID,
-//   claimKey: "bid.skyfireEmail",
-//   oryProjectUrl: `https://${oryProjectId}.projects.oryapis.com`,
-//   oryApiKey: oryApiKey,
-//   schemaId: "preset://email",
-// });
-
-// const oryAccessControlTool = accessControl.getToolDefinition();
 
  const createAccountAndLoginWithAuth0 = async (kyaToken: string, resToken: string) => {
     const auth = await fetch(
@@ -67,8 +47,6 @@ let resToken: string;
             issued_token_type: string;
           } = await auth.json();
 
-          // console.log("auth0 auth response", authRes);
-
           resToken = authRes.access_token;
           console.log("auth0 resToken");
           return {
@@ -81,47 +59,6 @@ let resToken: string;
           };
  }
 
-// const createAccountAndLoginWithOry = async (
-//   kya_token: string,
-//   password: string
-// ) => {
-//   try {
-//     const result = await oryAccessControlTool.handler({
-//       token: kya_token,
-//       password: password,
-//     });
-
-//     if (result.success) {
-//       return {
-//         content: [
-//           {
-//             type: "text",
-//             text: `Authentication successful! accessToken is : ${result.session?.token}`,
-//           },
-//         ],
-//       };
-//     } else {
-//       return {
-//         content: [
-//           {
-//             type: "text",
-//             text: `Authentication failed: ${result.error}`,
-//           },
-//         ],
-//       };
-//     }
-//   } catch (error) {
-//     return {
-//       content: [
-//         {
-//           type: "text",
-//           text: `Error: ${error}`,
-//         },
-//       ],
-//     };
-//   }
-// };
-
 export class MyMCP extends McpAgent<Bindings, State> {
   server = new McpServer({
     name: "carbonarc",
@@ -131,31 +68,6 @@ export class MyMCP extends McpAgent<Bindings, State> {
       tools: {},
     },
   });
-
-  //   withAuth = (handler: Function) => {
-  //     return async function checkSession(params, context) {
-  //       // call ORY to validate session 
-  //       const validationResult = await accessControl.validateSession(
-  //         { "x-session-token": params.access_token },
-  //         { headerName: "x-session-token" }
-  //       );
-        
-  //       // Token validation Failure: return error to client 
-  //       if (!validationResult.isValid) {
-  //         return {
-  //           content: [
-  //             {
-  //               type: "text",
-  //               text: `Unauthorized: ${validationResult.error}`,
-  //             },
-  //           ],
-  //         };
-  //       }
-
-  //       // Token validation Success: call tool business logic
-  //       return handler(params);
-  //     };
-  // };
 
   // Initialize mock data
   dataset = {
