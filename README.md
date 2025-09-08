@@ -42,7 +42,7 @@ Steps to be followed for setting up Auth0:
 2. Create a new tenant
 3. Follow the [Auth0 official documentation for creating a new custom token exchange profile](https://auth0.com/docs/authenticate/custom-token-exchange)
 4. Use the Auth0 Client ID, Client Secret, Domain etc details from Settings tab of your newly created Application in env variables in [CarbonArc MCP Server](https://github.com/skyfire-xyz/skyfire-solutions-okta-demo/tree/main/mcp-servers/carbonarc-seller-server).
-5. [Sample code for creating Auth0 Action](https://github.com/skyfire-xyz/skyfire-solutions-okta-demo/tree/main/auth0/sample-action-code.ts).
+5. [Sample code for creating Auth0 Action](https://github.com/skyfire-xyz/skyfire-solutions-okta-demo/tree/main/auth0/sample-action-code.ts) or refer to [Auth0 Marketplace implementation](https://github.com/dlozlla/opensource-marketplace/blob/feat-cte-template-skyfire-hardened/templates/skyfire-token-exchange-CUSTOM_TOKEN_EXCHANGE/code.js)
 
 ## Contents: 
 

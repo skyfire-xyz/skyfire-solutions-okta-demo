@@ -16,7 +16,7 @@ Steps to be followed for setting up Auth0:
 1. Visit the [Auth0 Dashboard](https://manage.auth0.com/dashboard/)
 2. Create a new tenant
 3. Follow the [Auth0 official documentation for creating a new custom token exchange profile](https://auth0.com/docs/authenticate/custom-token-exchange)
-4. [Sample code for creating Auth0 Action](https://github.com/skyfire-xyz/skyfire-solutions-okta-demo/tree/main/auth0/sample-action-code.ts).
+4. [Sample code for creating Auth0 Action](https://github.com/skyfire-xyz/skyfire-solutions-okta-demo/tree/main/auth0/sample-action-code.ts) or refer to [Auth0 Marketplace implementation](https://github.com/dlozlla/opensource-marketplace/blob/feat-cte-template-skyfire-hardened/templates/skyfire-token-exchange-CUSTOM_TOKEN_EXCHANGE/code.js)
    
 ## Installation
 
