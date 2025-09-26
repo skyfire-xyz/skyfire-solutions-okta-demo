@@ -138,11 +138,10 @@ export async function getAgent(
   input: string | Record<string, string>,
   agentContext: AgentContext,
 ) {
-  console.log("apiKey", apiKey);
   if(!apiKey)
     apiKey = process.env.SKYFIRE_API_KEY || "";
 
-  console.log("apiKey", apiKey);
+   console.log("apiKey in getAgent", apiKey);
   // set default agent context having SKYFIRE and VISUALIZATION MCP servers
   if (!agentContext || Object.keys(agentContext).length === 0) {
     agentContext = {
@@ -179,9 +178,11 @@ async function runAgent(
   agentContext: AgentContext,
   initialFormattedSteps: FormattedStep[] = []
 ) {
+  console.log("run started");
   // Prepare tools from all the connected MCP servers
   // eslint-disable-next-line prefer-const
   let allTools = await prepareAllTools(agentContext);
+  console.log("prepareAllTools done");
 
   // add user prompt to agentContext
   agentContext.conversation_history.push({
@@ -192,6 +193,7 @@ async function runAgent(
   // Step counter for logging
   let stepCounter = 0;
 
+  console.log("agent triggered")
   // Run agent by passing all the prepared tools and agentContext
   const {
     text: answer,
@@ -210,6 +212,8 @@ async function runAgent(
     },
   });
 
+  console.log("agent trigger complete")
+
   // Update agentContext to include all the executed steps
   agentContext.conversation_history.push(...response.messages);
 
@@ -224,6 +228,8 @@ async function runAgent(
     agentContext
   );
 
+  console.log("newToolsFound", newToolsFound);
+
   // If new tools are discovered, RE-RUN the agent
   if (newToolsFound) {
     const modelResponse = JSON.parse(
@@ -231,6 +237,8 @@ async function runAgent(
     );
     formattedSteps = modelResponse.steps;
   }
+
+  console.log("run end");
 
   // Return final response
   return JSON.stringify(
@@ -296,6 +304,7 @@ const prepareAllTools = async (agentContext: AgentContext) => {
 
   for (let i: number = 0; i < allServers?.length; i++) {
     const localVar = "client" + i;
+    console.log("Connecting to MCP server", i);
     client = await experimental_createMCPClient({
       transport: {
         type: "sse",
@@ -307,6 +316,7 @@ const prepareAllTools = async (agentContext: AgentContext) => {
     clients[localVar] = client;
 
     const toolSet = await client.tools();
+    console.log("fetched toolSet from MCP server", i)
     allTools = { ...allTools, ...toolSet };
 
     try {
@@ -324,6 +334,8 @@ const prepareAllTools = async (agentContext: AgentContext) => {
       const resource = await mcpClient.readResource({
         uri: resources.resources[0].uri,
       });
+
+      console.log("fetched resource", resources.resources[0].uri);
 
       agentContext.conversation_history.push({
         role: "system",
@@ -396,8 +408,10 @@ const checkAndUpdateAgentContextIfMCPConnectionIsInitiated = (
 
     if (toolCall && toolCall.toolName === "connect-mcp-server-tool") {
       const url = toolCall.args["mcpServerUrl"];
+      console.log("connect-mcp-server-tool triggered")
 
        agentContext.dynamically_mounted_server = [{ url: url, headers: {} }];
+       console.log("Dynamically loaded server")
 
       agentContext.conversation_history.push({
         role: "system",
