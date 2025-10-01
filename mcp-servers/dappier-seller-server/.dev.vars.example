@@ -1,0 +1,14 @@
+ACCESS_KEY_ID=<your_access_key>
+ACCOUNT_ID=<your_account_id>
+AUTH0_AUDIENCE=<your_auth0_audience>
+AUTH0_CLIENT_ID=<your_auth0_client_id>
+AUTH0_CLIENT_SECRET=<your_auth0_client_secret>
+AUTH0_GRANT_TYPE=<your_auth0_grant_type>
+AUTH0_SUBJECT_TOKEN_TYPE=<your_auth0_subject_token_type>
+AUTH0_URL=<your_auth0_url>
+DAPPIER_SELLER_ID=<your_dappier_seller_id>
+JWKS_URL=https://api.skyfire.xyz/.well-known/jwks.json
+JWT_ISSUER=https://app.skyfire.xyz/
+SECRET_ACCESS_KEY=<secret_access_key>
+SKYFIRE_API_BASE_URL=https://api.skyfire.xyz
+SKYFIRE_API_KEY=<your_skyfire_api_key>
