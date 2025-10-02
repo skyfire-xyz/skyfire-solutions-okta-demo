@@ -119,7 +119,7 @@ exports.onExecuteCustomTokenExchange = async (event, api) => {
         email_verified: true,
         verify_email: false,
     };
-    // console.log("Patching with", patch);
+
     if (name) {
         patch.name = name;
     }
