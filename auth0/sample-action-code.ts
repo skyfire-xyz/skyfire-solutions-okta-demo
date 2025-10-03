@@ -1,7 +1,4 @@
 /**
- * 
- * Source: https://github.com/dlozlla/opensource-marketplace/blob/feat-cte-template-skyfire-hardened/templates/skyfire-token-exchange-CUSTOM_TOKEN_EXCHANGE/code.js
- *  
  * @file Template for an Auth0 Action to handle a Custom Token Exchange.
  * This script implements the common scenario of validating a third-party (Skyfire) JWT,
  * received as a subject_token, and exchanging it for an Auth0 access token.
@@ -26,15 +23,13 @@
  */
 
 const { jwtVerify, importJWK } = require('jose');
+const { ManagementClient } = require("auth0");
+
 var validator = require('validator');
 
 // --- CONFIGURATION: REVIEW AND UPDATE ---
 // The name of the Auth0 Database Connection where user profiles will be created or managed.
 const DB_NAME = '{{DATABASE_CONNECTION}}';
-
-// A list of client_ids authorized to perform this token exchange.
-// For example ['wVZz7cluiteQz2PpUot4Odw3xeu9u8B4']
-const ALLOWED_CLIENT_IDS = [];
 
 // A list of API identifiers (audiences) that are allowed.
 // To disable this check and allow any API, set this to: null
@@ -42,7 +37,7 @@ const ALLOWED_CLIENT_IDS = [];
 // To allow no audiences, leave as an empty array: [] (SECURE BY DEFAULT)
 // NOTE: Alternatively, you can manage API access via Auth0 Application settings.
 // See: https://auth0.com/docs/get-started/apis/api-access-policies-for-applications
-const ALLOWED_AUDIENCES = [];
+const ALLOWED_AUDIENCES = ['{{CUSTOM_API_IDENTIFIER}}']; 
 
 // A list of allowed scopes.
 // To disable this check and allow any scope, set this to: null
@@ -68,14 +63,6 @@ const fetchTimeout = 5000;
  * @param {CustomTokenExchangeAPI} api - Methods and utilities to define the token exchange process.
  */
 exports.onExecuteCustomTokenExchange = async (event, api) => {
-    // 1. Validate that the request originates from an authorized client application.
-    if (!ALLOWED_CLIENT_IDS.includes(event.client.client_id)) {
-        return api.access.deny(
-            'unauthorized_client',
-            'This client is not authorized to exchange Skyfire tokens.'
-        );
-    }
-
     // 2. Validate the target API (audience), if an allow-list is configured.
     if (ALLOWED_AUDIENCES !== null) {
         const requestedAudience = event.resource_server
@@ -113,25 +100,85 @@ exports.onExecuteCustomTokenExchange = async (event, api) => {
         return api.access.deny('invalid_subject_token', error.message);
     }
 
+    // 5. Check if user already exists in Auth0 using Management API v2
+    const existingUser = await getUserByEmail(payload.bid.skyfireEmail);
+
+    if (existingUser) {
+        // User exists, use their existing user_id
+        userId = existingUser.user_id;
+        console.log(`Found existing user with ID: ${userId} for email: ${payload.bid.skyfireEmail}`);
+        api.authentication.setUserById(existingUser.user_id);
+        return;
+    }
+
+    const name = `${payload.bid.nameFirst} ${payload.bid.nameLast}`;
+    const patch = {
+        user_id: payload.sub,
+        email: payload.bid.skyfireEmail,
+        username: payload.sub,
+        email_verified: true,
+        verify_email: false,
+    };
+
+    if (name) {
+        patch.name = name;
+    }
+
+    if (payload.bid.nameFirst) {
+        patch.given_name = payload.bid.nameFirst;
+        patch.nickname  = payload.bid.nameFirst;
+    }
+
+    if (payload.bid.nameLast) {
+        patch.family_name = payload.bid.nameLast;
+    }
+
+
     // If the token is valid, provision the user in Auth0.
     api.authentication.setUserByConnection(
         DB_NAME,
         {
-            user_id: payload.sub,
-            email: payload.bid.skyfireEmail,
-            email_verified: true,
-            given_name: payload.bid.nameFirst,
-            family_name: payload.bid.nameLast,
-            username: payload.sub,
-            name: `${payload.bid.nameFirst} ${payload.bid.nameLast}`,
-            nickname: payload.bid.nameFirst,
-            verify_email: false,
+            ...patch
         },
         {
             creationBehavior: 'create_if_not_exists',
-            updateBehavior: 'none',
+            updateBehavior: 'replace',
         }
     );
+
+    /**
+     * Gets a user by email using Auth0 Management API v2.
+     * @param {string} email - The email address to search for.
+     * @returns {Promise<object|null>} The user object if found, null otherwise.
+     */
+    async function getUserByEmail(email) {
+        try {
+            const management = new ManagementClient({
+                domain: event.secrets.DOMAIN,
+                clientId: event.secrets.CLIENT_ID,
+                clientSecret: event.secrets.CLIENT_SECRET,
+                scope: 'read:users'
+            });
+
+            const users = await management.users.listUsersByEmail({
+                email
+            });
+
+            console.log("Found users", users);
+            if (users && users.length > 0) {
+                // Return the first user found with this email
+                // In most cases, there should only be one user per email
+                return users[0];
+            }
+            
+            return null;
+        } catch (err) {
+            console.log(`Error fetching user by email ${email}:`, err.message);
+            // If we can't fetch the user, we'll assume they don't exist
+            // This allows the flow to continue and create a new user
+            return null;
+        }
+    }
 
     /**
      * Validates the provided JWT. It verifies the signature against the JWKS,
