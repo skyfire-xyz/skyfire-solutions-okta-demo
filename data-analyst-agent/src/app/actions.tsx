@@ -63,7 +63,7 @@ const textConfig: {[key:string]: string} = {
 
 const connectMcpServerTool = {
   "connect-mcp-server-tool": {
-    description: "Connects to the seller MCP server URL",
+    description: "Connects to the seller MCP server URL. After calling this tool, stop agent exection immediately after.",
     parameters: jsonSchema({
       type: "object",
       properties: {
@@ -84,7 +84,7 @@ const connectMcpServerTool = {
         content: [
           {
             type: "text",
-            text: `Connecting to ${sellerName} MCP server from ${mcpServerUrl}`,
+            text: `Connecting to ${sellerName} MCP server from ${mcpServerUrl}. Stopping and restarting agent to connect to tools provided by the seller.`,
           },
         ],
       };
