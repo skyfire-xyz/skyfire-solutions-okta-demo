@@ -22,15 +22,15 @@ Steps to be followed for setting up Auth0:
 
 1.  Install dependencies:
     ```bash
-    npm install
+    yarn install
     ```
 2. Follow the [Skyfire Platform Setup Guide](https://docs.skyfire.xyz/docs/introduction) to create seller account and seller services.
 3. Use the Auth0 Client ID, Client Secret, Domain etc details from Settings tab of your newly created Application in env variables in [Dappier MCP Server](https://github.com/skyfire-xyz/skyfire-solutions-okta-demo/tree/main/mcp-servers/dappier-seller-server).
 4. Set up environment variables:
-    Create a `.dev.vars` file in the root directory. You can copy `.dev.vars.example` if one exists, or add the necessary variables manually.
+    Create a `.env` file in the directory. You can copy `.env.example` if one exists, or add the necessary variables manually.
 
     ```
-    # .dev.vars
+    # .env
     DAPPIER_SELLER_SERVICE_ID=<your_seller_service_id>
     JWKS_URL=https://api.skyfire.xyz/.well-known/jwks.json
     SKYFIRE_API_KEY=<your_dappier_seller_api_key>
@@ -47,7 +47,5 @@ Steps to be followed for setting up Auth0:
 ## Run the development server:
 
 ```bash
-npm run dev
+yarn start
 ```
-
-The MCP server will run on [http://localhost:8789/sse](http://localhost:8789/sse).
