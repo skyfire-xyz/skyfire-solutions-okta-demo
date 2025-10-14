@@ -13,7 +13,7 @@ A dataset for pickup truck sales
 ```
 
 ## Live Demo Link
-You can play with the live demo [here](https://data-analyst-agent-okta-demo-74464367970.us-central1.run.app).
+You can play with the live demo [here](https://data-analyst-agent-okta-demo.skyfire.xyz/).
 
 ## Flow
 - The buyer agent already has an account with Skyfire and Skyfire's Identity and Payment MCP server is already setup in the buyer agent
@@ -66,4 +66,4 @@ The following MCP servers are based on the StreamableHTTP transport protocol.
 3. Setup OpenAI account and get API key for LLM.
 
 ## Note:
-Take a look at the live demo [here](https://data-analyst-agent-okta-demo-74464367970.us-central1.run.app).
+Take a look at the live demo [here](https://data-analyst-agent-okta-demo.skyfire.xyz/).
