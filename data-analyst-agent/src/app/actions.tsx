@@ -228,7 +228,7 @@ const getStepDescription = (step: AIStep, toolCall: ToolCall | null) => {
   if (toolCall) {
     text = textConfig[toolCall.toolName] || text;
     if (toolCall.toolName === "get-pricing") {
-      text = text + toolCall.args["datasetId"];
+      text = text + " " + toolCall.args["datasetId"];
     }
   }
   return text;
