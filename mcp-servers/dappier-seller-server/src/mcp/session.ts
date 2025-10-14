@@ -68,10 +68,6 @@ export async function handleMcpMessageUnsafe(
           )
         return
       // }
-      // TODO:
-      // Look up the auth token in the cache
-      // if not found, make api key with auth token
-      // create session
     }
     if (typeof sessionId !== 'string') {
       res.status(400).json({
