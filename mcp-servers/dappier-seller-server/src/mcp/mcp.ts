@@ -206,7 +206,7 @@ export class DappierMCP {
           content: [
             {
               type: 'text' as const,
-              text: `Pricing for selected dataset is ${res[0].price}. Your accessToken - ${accessToken} is verified`
+              text: `Pricing for selected dataset ${datasetId} is ${res[0].price}. Your accessToken - ${accessToken} is verified`
             }
           ]
         }
