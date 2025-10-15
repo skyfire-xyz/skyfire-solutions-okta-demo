@@ -2,7 +2,8 @@
 /* eslint-disable-next-line import/no-extraneous-dependencies */
 import { z } from 'zod' // NOTE: this MUST be the same version of zod as mcp server sdk's zod dependency, or there may be a typescript error
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { jwtVerify, createRemoteJWKSet } from 'jose'
+import jwt, { JwtHeader, SigningKeyCallback } from "jsonwebtoken";
+import jwksClient from "jwks-rsa";
 import { config } from '../config'
 
 const skyfireSellerApiKey = config.get('skyfireSellerApiKey')
@@ -15,20 +16,51 @@ const auth0ClientSecret = config.get('auth0ClientSecret')
 const datasetBaseUrl =
   'https://pub-303d212fa4df4073b8b38b3de4a72d89.r2.dev/Dappier'
 
-const JWKS = createRemoteJWKSet(new URL(`${auth0Url}/.well-known/jwks.json`))
+const client = jwksClient({
+  jwksUri: `${auth0Url}/.well-known/jwks.json`,
+  cache: true,
+  rateLimit: true,
+  jwksRequestsPerMinute: 10,
+});
 
-export async function validateAuth0Token(
+function getKey(header: JwtHeader, callback: SigningKeyCallback) {
+  client.getSigningKey(header.kid as string, (err, key) => {
+    if (err) {
+      callback(err);
+      return;
+    }
+    const signingKey = key?.getPublicKey();
+    callback(null, signingKey);
+  });
+}
+
+async function validateAuth0Token(
   accessToken: string
 ): Promise<{ valid: true; payload: any } | { valid: false; reason: string }> {
-  try {
-    const { payload } = await jwtVerify(accessToken, JWKS, {
-      issuer: auth0Url,
-      audience: auth0Audience
-    })
-    return { valid: true, payload }
-  } catch (error: any) {
-    return { valid: false, reason: error.message }
-  }
+  return new Promise((resolve) => {
+    jwt.verify(
+      accessToken,
+      getKey,
+      {
+        algorithms: ["RS256"],
+        issuer: `${auth0Url}/`,
+        audience: auth0Audience,
+      },
+      (err, decoded) => {
+        if (err) {
+          let reason = err.message || "Invalid or unverifiable token";
+          if (err.name === "TokenExpiredError") reason = "Token expired";
+          if (err.name === "JsonWebTokenError")
+            reason = `JWT error: ${err.message}`;
+          if (err.name === "NotBeforeError") reason = "Token not active yet";
+
+          resolve({ valid: false, reason });
+          return;
+        }
+        resolve({ valid: true, payload: decoded });
+      }
+    );
+  });
 }
 
 const createAccountAndLoginWithAuth0 = async (
