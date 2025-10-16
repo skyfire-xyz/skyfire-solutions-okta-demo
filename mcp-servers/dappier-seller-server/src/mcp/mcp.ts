@@ -68,7 +68,7 @@ const createAccountAndLoginWithAuth0 = async (
   resToken: string
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 ) => {
-  const auth = await fetch(auth0Url, {
+  const auth = await fetch(`${auth0Url}/oauth/token`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -103,7 +103,7 @@ const createAccountAndLoginWithAuth0 = async (
 
 export class DappierMCP {
   readonly server = new McpServer({
-    name: 'carbonarc-mcp-server-v1',
+    name: 'dappier-mcp-server-v1',
     version: '0.0.1',
     capabilities: {
       resources: {},
