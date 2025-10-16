@@ -34,7 +34,7 @@ function getKey(header: JwtHeader, callback: SigningKeyCallback) {
   });
 }
 
-async function validateAuth0Token(
+function validateAuth0Token(
   accessToken: string
 ): Promise<{ valid: true; payload: any } | { valid: false; reason: string }> {
   return new Promise((resolve) => {
