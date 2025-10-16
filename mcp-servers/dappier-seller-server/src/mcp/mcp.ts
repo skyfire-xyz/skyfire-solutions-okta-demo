@@ -2,6 +2,8 @@
 /* eslint-disable-next-line import/no-extraneous-dependencies */
 import { z } from 'zod' // NOTE: this MUST be the same version of zod as mcp server sdk's zod dependency, or there may be a typescript error
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import jwt, { JwtHeader, SigningKeyCallback } from "jsonwebtoken";
+import jwksClient from "jwks-rsa";
 import { config } from '../config'
 
 const skyfireSellerApiKey = config.get('skyfireSellerApiKey')
@@ -14,12 +16,59 @@ const auth0ClientSecret = config.get('auth0ClientSecret')
 const datasetBaseUrl =
   'https://pub-303d212fa4df4073b8b38b3de4a72d89.r2.dev/Dappier'
 
+const client = jwksClient({
+  jwksUri: `${auth0Url}/.well-known/jwks.json`,
+  cache: true,
+  rateLimit: true,
+  jwksRequestsPerMinute: 10,
+});
+
+function getKey(header: JwtHeader, callback: SigningKeyCallback) {
+  client.getSigningKey(header.kid as string, (err, key) => {
+    if (err) {
+      callback(err);
+      return;
+    }
+    const signingKey = key?.getPublicKey();
+    callback(null, signingKey);
+  });
+}
+
+async function validateAuth0Token(
+  accessToken: string
+): Promise<{ valid: true; payload: any } | { valid: false; reason: string }> {
+  return new Promise((resolve) => {
+    jwt.verify(
+      accessToken,
+      getKey,
+      {
+        algorithms: ["RS256"],
+        issuer: `${auth0Url}/`,
+        audience: auth0Audience,
+      },
+      (err, decoded) => {
+        if (err) {
+          let reason = err.message || "Invalid or unverifiable token";
+          if (err.name === "TokenExpiredError") reason = "Token expired";
+          if (err.name === "JsonWebTokenError")
+            reason = `JWT error: ${err.message}`;
+          if (err.name === "NotBeforeError") reason = "Token not active yet";
+
+          resolve({ valid: false, reason });
+          return;
+        }
+        resolve({ valid: true, payload: decoded });
+      }
+    );
+  });
+}
+
 const createAccountAndLoginWithAuth0 = async (
   kyaToken: string,
   resToken: string
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 ) => {
-  const auth = await fetch(auth0Url, {
+  const auth = await fetch(`${auth0Url}/oauth/token`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -54,13 +103,34 @@ const createAccountAndLoginWithAuth0 = async (
 
 export class DappierMCP {
   readonly server = new McpServer({
-    name: 'carbonarc-mcp-server-v1',
+    name: 'dappier-mcp-server-v1',
     version: '0.0.1',
     capabilities: {
       resources: {},
       tools: {}
     }
   })
+  
+  withAuth(handler: (args: any, extra?: any) => Promise<any>) {
+      return async (args: any, extra?: any) => {
+        const { accessToken } = args;
+
+        const validation = await validateAuth0Token(accessToken);
+
+        if (!validation.valid) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `Unauthorized: ${validation.reason}`,
+              },
+            ],
+          };
+        }
+
+        return await handler(args, extra);
+      };
+    }
 
   // Initialize mock data
   dataset = {
@@ -156,7 +226,7 @@ export class DappierMCP {
           .string()
           .describe('Access token required to access and execute this tool')
       },
-      async ({ accessToken }) => {
+      this.withAuth(async ({ accessToken }) => {
         let response = `Following is the comma separated list of data available from seller ${this.dataset.skyfireReceiverUsername}. 
           Each entry has an id, title and size associated.`
 
@@ -185,7 +255,7 @@ export class DappierMCP {
           ]
         }
       }
-    )
+    ))
 
     this.server.tool(
       'get-pricing',
@@ -197,7 +267,7 @@ export class DappierMCP {
           .describe('Access token required to access and execute this tool'),
         datasetId: z.number().describe('ID for chosen dataset')
       },
-      async ({ accessToken, datasetId }) => {
+      this.withAuth(async ({ accessToken, datasetId }) => {
         const res = this.dataset.data.filter((data) => {
           return data.dataId === datasetId
         })
@@ -211,7 +281,7 @@ export class DappierMCP {
           ]
         }
       }
-    )
+    ))
 
     this.server.tool(
       'download-dataset',
@@ -231,7 +301,7 @@ export class DappierMCP {
           )
       },
 
-      async ({ accessToken, datasetId, payToken }) => {
+      this.withAuth(async ({ accessToken, datasetId, payToken }) => {
         const currentDataset = this.dataset.data.filter((data) => {
           return data.dataId === datasetId
         })
@@ -278,6 +348,6 @@ export class DappierMCP {
           ]
         }
       }
-    )
+    ))
   }
 }
