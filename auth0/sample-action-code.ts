@@ -101,12 +101,12 @@ exports.onExecuteCustomTokenExchange = async (event, api) => {
     }
 
     // 5. Check if user already exists in Auth0 using Management API v2
-    const existingUser = await getUserByEmail(payload.bid.skyfireEmail);
+    const existingUser = await getUserByEmail(payload.bid.email);
 
     if (existingUser) {
         // User exists, use their existing user_id
         userId = existingUser.user_id;
-        console.log(`Found existing user with ID: ${userId} for email: ${payload.bid.skyfireEmail}`);
+        console.log(`Found existing user with ID: ${userId} for email: ${payload.bid.email}`);
         api.authentication.setUserById(existingUser.user_id);
         return;
     }
@@ -114,7 +114,7 @@ exports.onExecuteCustomTokenExchange = async (event, api) => {
     const name = `${payload.bid.nameFirst} ${payload.bid.nameLast}`;
     const patch = {
         user_id: payload.sub,
-        email: payload.bid.skyfireEmail,
+        email: payload.bid.email,
         username: payload.sub,
         email_verified: true,
         verify_email: false,
@@ -258,13 +258,13 @@ exports.onExecuteCustomTokenExchange = async (event, api) => {
                 };
             }
 
-            // 2. Validate skyfireEmail format.
+            // 2. Validate email format.
             if (
                 !payload.bid ||
-                !validator.isEmail(String(payload.bid.skyfireEmail))
+                !validator.isEmail(String(payload.bid.email))
             ) {
                 const message =
-                    "Invalid email format in 'bid.skyfireEmail' claim.";
+                    "Invalid email format in 'bid.email' claim.";
                 console.log(`Validation failed: ${message}`);
                 return {
                     isValid: false,
