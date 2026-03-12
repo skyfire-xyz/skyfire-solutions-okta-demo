@@ -111,7 +111,7 @@ exports.onExecuteCustomTokenExchange = async (event, api) => {
         return;
     }
 
-    const name = `${payload.hid.nameFirst} ${payload.hid.nameLast}`;
+    const name = `${payload.hid.given_name} ${payload.hid.family_name}`;
     const patch = {
         user_id: payload.sub,
         email: payload.hid.email,
@@ -124,13 +124,13 @@ exports.onExecuteCustomTokenExchange = async (event, api) => {
         patch.name = name;
     }
 
-    if (payload.hid.nameFirst) {
-        patch.given_name = payload.hid.nameFirst;
-        patch.nickname  = payload.hid.nameFirst;
+    if (payload.hid.given_name) {
+        patch.given_name = payload.hid.given_name;
+        patch.nickname  = payload.hid.given_name;
     }
 
-    if (payload.hid.nameLast) {
-        patch.family_name = payload.hid.nameLast;
+    if (payload.hid.family_name) {
+        patch.family_name = payload.hid.family_name;
     }
 
 
