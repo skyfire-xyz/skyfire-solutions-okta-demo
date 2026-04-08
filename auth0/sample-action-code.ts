@@ -247,8 +247,8 @@ exports.onExecuteCustomTokenExchange = async (event, api) => {
             // -- Additional Custom Validations --
 
             // 1. Validate 'typ' header: must be one of the expected types.
-            if (!['kya+jwt', 'kya+pay+jwt'].includes(protectedHeader.typ)) {
-                const message = 'typ should be one of kya+jwt or kya+pay+jwt.';
+            if (!['kya+jwt', 'kya-pay+jwt'].includes(protectedHeader.typ)) {
+                const message = 'typ should be one of kya+jwt or kya-pay+jwt.';
                 console.log(
                     `Validation failed: ${message} (got: ${protectedHeader.typ})`
                 );
