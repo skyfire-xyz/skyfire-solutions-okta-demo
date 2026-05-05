@@ -21,7 +21,7 @@ const defaultComponents: Components = {
         "bg-neutral-50 text-neutral-900",
         "font-mono text-sm",
         "border border-neutral-200",
-        "w-full"
+        "w-full",
       )}
     >
       {children}
@@ -37,7 +37,7 @@ const defaultComponents: Components = {
         "whitespace-pre-wrap break-words",
         "not-prose",
         className?.includes("language-") ? "block" : "inline-block",
-        className
+        className,
       )}
       {...props}
     >
@@ -54,7 +54,7 @@ export const MarkdownRenderer: FC<MarkdownProps> = memo(
         "max-w-none break-words overflow-hidden",
         "[&_pre]:bg-neutral-50 [&_pre]:text-neutral-900",
         "[&_code]:text-neutral-900",
-        className
+        className,
       )}
     >
       <ReactMarkdown
@@ -68,7 +68,7 @@ export const MarkdownRenderer: FC<MarkdownProps> = memo(
   ),
   (prevProps, nextProps) =>
     prevProps.children === nextProps.children &&
-    prevProps.className === nextProps.className
+    prevProps.className === nextProps.className,
 );
 
 MarkdownRenderer.displayName = "MarkdownRenderer";

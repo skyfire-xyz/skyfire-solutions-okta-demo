@@ -35,11 +35,12 @@ const completionVariants = cva(
       size: "default",
       animation: "none",
     },
-  }
+  },
 );
 
 export interface CompletionIndicatorProps
-  extends React.HTMLAttributes<HTMLDivElement>,
+  extends
+    React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof completionVariants> {
   status?: "success" | "error" | "warning" | "pending";
   message?: string;
@@ -85,7 +86,7 @@ export function CompletionIndicator({
           size,
           animation: status === "pending" ? "spin" : animation,
         }),
-        className
+        className,
       )}
       {...props}
     >

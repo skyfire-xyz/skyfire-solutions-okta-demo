@@ -76,7 +76,10 @@ export const AgentOutputCards = {
                       >
                         <Badge variant="secondary" className="text-xs">
                           {step.tool === "retrieve-file-content" ? (
-                            <span data-tool-name="retrieve-file-content" className="retrieve-file-content-tool-badge">
+                            <span
+                              data-tool-name="retrieve-file-content"
+                              className="retrieve-file-content-tool-badge"
+                            >
                               {step.tool}
                             </span>
                           ) : (
@@ -457,7 +460,7 @@ export const AgentOutputCards = {
                           iteration.evaluation.quality >= 5 &&
                           iteration.evaluation.quality < 8,
                         "bg-green-50/30": iteration.evaluation.quality >= 8,
-                      }
+                      },
                     )}
                   >
                     <Badge variant="outline">
@@ -483,7 +486,7 @@ export const AgentOutputCards = {
                             iteration.evaluation.quality >= 5 &&
                             iteration.evaluation.quality < 8,
                           "bg-green-50/30": iteration.evaluation.quality >= 8,
-                        }
+                        },
                       )}
                     >
                       <div className="text-xs font-bold uppercase font-mono text-neutral-500 mb-1"></div>

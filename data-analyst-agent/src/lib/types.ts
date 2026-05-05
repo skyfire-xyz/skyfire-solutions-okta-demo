@@ -23,10 +23,13 @@ export interface InputField {
 }
 
 export interface AgentContext {
-  available_mcp_servers: {url: string, headers: Record<string, string>}[], 
-  dynamically_mounted_server: {url: string, headers: Record<string, string>}[],
-  conversation_history: CoreMessage[]
-} 
+  available_mcp_servers: { url: string; headers: Record<string, string> }[];
+  dynamically_mounted_server: {
+    url: string;
+    headers: Record<string, string>;
+  }[];
+  conversation_history: CoreMessage[];
+}
 
 export interface AgentType {
   name: string;
@@ -122,12 +125,12 @@ export const agentResultSchema = z.object({
             name: z.string(),
             parameters: z.record(z.unknown()),
             result: z.unknown().optional(),
-          })
+          }),
         )
         .optional(),
       toolResults: z.array(z.unknown()).optional(),
       finishReason: z.string(),
-    })
+    }),
   ),
   toolCalls: z.array(
     z.object({
@@ -135,7 +138,7 @@ export const agentResultSchema = z.object({
       name: z.string(),
       parameters: z.record(z.unknown()),
       result: z.unknown().optional(),
-    })
+    }),
   ),
   usage: z.object({
     promptTokens: z.number(),
@@ -161,7 +164,7 @@ export const agentTypes = [
         name: "prompt",
         type: "textarea" as const,
         label: "Purchase Intent",
-        placeholder: ``, 
+        placeholder: ``,
         // Describe your purchase in detail. The agent will discover products and services from vendors, finding the right items that match your criteria and handle the transaction securely.\n\nExample purchases:\n\n1. Data Analysis:\n   "I need market research data for the electric vehicle industry in Europe:\n   - Time period: Last 5 years\n   - Geographic focus: Germany, France, UK\n   - Data points: Sales volumes, market share, pricing trends\n   - Format: CSV or Excel\n   - Budget: $2,500"\n\n2. API Access:\n   "Looking for real-time weather data API:\n   - Global coverage required\n   - Update frequency: Every 15 minutes\n   - Historical data: 5 years\n   - SLA: 99.9% uptime\n   - Budget: $1,000/month"\n\n3. Business Intelligence:\n   "Seeking competitive intelligence data for retail sector:\n   - Competitor pricing and promotions\n   - Store location analytics\n   - Customer demographic insights\n   - Data refresh: Weekly\n   - Budget: $5,000"
       },
     ],

@@ -3,7 +3,14 @@ import { DDTransportOptions } from 'pino-datadog-transport'
 import { AxiosError, isAxiosError } from 'axios'
 import { Request } from 'express'
 import { pinoHttp, Options as HttpOptions } from 'pino-http'
-import { pino, Logger, TransportMultiOptions, LoggerOptions, stdSerializers, Level } from 'pino'
+import {
+  pino,
+  Logger,
+  TransportMultiOptions,
+  LoggerOptions,
+  stdSerializers,
+  Level
+} from 'pino'
 import { AppEnv, config } from './config'
 
 export type LogLevel = Level

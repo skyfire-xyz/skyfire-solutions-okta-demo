@@ -26,7 +26,7 @@ function LoadingState({
 }) {
   const progress = Math.min(
     (elapsedTime / (agent.averageTime || 30)) * 100,
-    100
+    100,
   );
 
   return (
@@ -476,13 +476,13 @@ function Countdown({
         "shadow-[inset_0px_-2.10843px_0px_0px_rgb(244,241,238),_0px_1.20482px_6.3253px_0px_rgb(244,241,238)]",
         "border border-[#E9E3DD] text-[#36322F] ",
         loading ? "text-blue-500" : "text-neutral-500",
-        className
+        className,
       )}
     >
       <Clock02Icon
         className={cn(
           "w-3.5 h-3.5",
-          loading && "animate-[spin_3s_linear_infinite]"
+          loading && "animate-[spin_3s_linear_infinite]",
         )}
       />
       <NumberFlowGroup>
@@ -496,13 +496,13 @@ function Countdown({
               format={{ minimumIntegerDigits: 2 }}
               className={cn(
                 "text-sm transition-colors duration-200",
-                loading ? "text-blue-600" : "text-neutral-600"
+                loading ? "text-blue-600" : "text-neutral-600",
               )}
             />
             <span
               className={cn(
                 "text-[10px] font-medium transition-colors duration-200",
-                loading ? "text-blue-400" : "text-neutral-400"
+                loading ? "text-blue-400" : "text-neutral-400",
               )}
             >
               s
@@ -511,7 +511,7 @@ function Countdown({
           <span
             className={cn(
               "mx-0.5 transition-colors duration-200",
-              loading ? "text-blue-400/70" : "text-neutral-300"
+              loading ? "text-blue-400/70" : "text-neutral-300",
             )}
           >
             .
@@ -522,13 +522,13 @@ function Countdown({
               format={{ minimumIntegerDigits: 2 }}
               className={cn(
                 "text-sm transition-colors duration-200",
-                loading ? "text-blue-500" : "text-neutral-500"
+                loading ? "text-blue-500" : "text-neutral-500",
               )}
             />
             <span
               className={cn(
                 "text-[10px] font-medium transition-colors duration-200 ml-0.5",
-                loading ? "text-blue-400" : "text-neutral-400"
+                loading ? "text-blue-400" : "text-neutral-400",
               )}
             >
               ms
