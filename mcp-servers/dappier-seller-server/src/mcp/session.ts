@@ -60,13 +60,13 @@ export async function handleMcpMessageUnsafe(
     const sessionId = req.headers['mcp-session-id']
     if (sessionId === undefined) {
       // if (req.headers.authorization === undefined) {
-        res
-          .status(401)
-          .header(
-            'www-authenticate',
-            `resource_metadata=${RESOURCE_METADATA_URL}/.well-known/oauth-protected-resource`
-          )
-        return
+      res
+        .status(401)
+        .header(
+          'www-authenticate',
+          `resource_metadata=${RESOURCE_METADATA_URL}/.well-known/oauth-protected-resource`
+        )
+      return
       // }
     }
     if (typeof sessionId !== 'string') {

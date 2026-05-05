@@ -11,7 +11,7 @@ function generateUsages(startDay: number, days: number): Usages {
     day: number,
     min: number,
     max: number,
-    cleanPercentage: number = 0
+    cleanPercentage: number = 0,
   ): Usage => {
     const amount = Number((Math.random() * (max - min) + min).toFixed(1));
     return {

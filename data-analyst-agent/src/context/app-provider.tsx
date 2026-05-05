@@ -17,12 +17,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   console.log("apiKey in app-provider", apiKey);
 
-  const [agentContext, setAgentContext] = useState<AgentContext>(()  => {
+  const [agentContext, setAgentContext] = useState<AgentContext>(() => {
     if (typeof window !== "undefined") {
-      return (
-        JSON.parse(sessionStorage.getItem("agentContext")||"{}") ||
-        {}
-      );
+      return JSON.parse(sessionStorage.getItem("agentContext") || "{}") || {};
     }
     return {};
   });
@@ -43,7 +40,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     apiKey,
     setApiKey,
     agentContext,
-    setAgentContext
+    setAgentContext,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

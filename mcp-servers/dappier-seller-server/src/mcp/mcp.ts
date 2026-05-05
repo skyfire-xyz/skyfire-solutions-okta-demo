@@ -2,8 +2,8 @@
 /* eslint-disable-next-line import/no-extraneous-dependencies */
 import { z } from 'zod' // NOTE: this MUST be the same version of zod as mcp server sdk's zod dependency, or there may be a typescript error
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import jwt, { JwtHeader, SigningKeyCallback } from "jsonwebtoken";
-import jwksClient from "jwks-rsa";
+import jwt, { JwtHeader, SigningKeyCallback } from 'jsonwebtoken'
+import jwksClient from 'jwks-rsa'
 import { config } from '../config'
 
 const skyfireSellerApiKey = config.get('skyfireSellerApiKey')
@@ -20,47 +20,62 @@ const client = jwksClient({
   jwksUri: `${auth0Url}/.well-known/jwks.json`,
   cache: true,
   rateLimit: true,
-  jwksRequestsPerMinute: 10,
-});
+  jwksRequestsPerMinute: 10
+})
 
 function getKey(header: JwtHeader, callback: SigningKeyCallback) {
   client.getSigningKey(header.kid as string, (err, key) => {
     if (err) {
-      callback(err);
-      return;
+      callback(err)
+      return
     }
-    const signingKey = key?.getPublicKey();
-    callback(null, signingKey);
-  });
+    const signingKey = key?.getPublicKey()
+    callback(null, signingKey)
+  })
 }
 
 async function validateAuth0Token(
   accessToken: string
 ): Promise<{ valid: true; payload: any } | { valid: false; reason: string }> {
   return new Promise((resolve) => {
+    // Decode metadata for debugging invalid signature / issuer / audience mismatches.
+    // This does NOT verify the token and intentionally avoids logging the full token.
+    const decoded = jwt.decode(accessToken, { complete: true }) as {
+      header?: JwtHeader
+      payload?: any
+    } | null
+    const tokenMeta = {
+      kid: decoded?.header?.kid,
+      alg: decoded?.header?.alg,
+      iss: decoded?.payload?.iss,
+      aud: decoded?.payload?.aud
+    }
+
     jwt.verify(
       accessToken,
       getKey,
       {
-        algorithms: ["RS256"],
+        algorithms: ['RS256'],
         issuer: `${auth0Url}/`,
-        audience: auth0Audience,
+        audience: auth0Audience
       },
       (err, decoded) => {
         if (err) {
-          let reason = err.message || "Invalid or unverifiable token";
-          if (err.name === "TokenExpiredError") reason = "Token expired";
-          if (err.name === "JsonWebTokenError")
-            reason = `JWT error: ${err.message}`;
-          if (err.name === "NotBeforeError") reason = "Token not active yet";
+          let reason = err.message || 'Invalid or unverifiable token'
+          if (err.name === 'TokenExpiredError') reason = 'Token expired'
+          if (err.name === 'JsonWebTokenError')
+            reason = `JWT error: ${err.message}`
+          if (err.name === 'NotBeforeError') reason = 'Token not active yet'
 
-          resolve({ valid: false, reason });
-          return;
+          reason = `${reason} (tokenMeta=${JSON.stringify(tokenMeta)})`
+
+          resolve({ valid: false, reason })
+          return
         }
-        resolve({ valid: true, payload: decoded });
+        resolve({ valid: true, payload: decoded })
       }
-    );
-  });
+    )
+  })
 }
 
 const createAccountAndLoginWithAuth0 = async (
@@ -110,27 +125,27 @@ export class DappierMCP {
       tools: {}
     }
   })
-  
+
   withAuth(handler: (args: any, extra?: any) => Promise<any>) {
-      return async (args: any, extra?: any) => {
-        const { accessToken } = args;
+    return async (args: any, extra?: any) => {
+      const { accessToken } = args
 
-        const validation = await validateAuth0Token(accessToken);
+      const validation = await validateAuth0Token(accessToken)
 
-        if (!validation.valid) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: `Unauthorized: ${validation.reason}`,
-              },
-            ],
-          };
+      if (!validation.valid) {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: `Unauthorized: ${validation.reason}`
+            }
+          ]
         }
+      }
 
-        return await handler(args, extra);
-      };
+      return await handler(args, extra)
     }
+  }
 
   // Initialize mock data
   dataset = {
@@ -172,7 +187,6 @@ export class DappierMCP {
   }
 
   init(): void {
-
     this.server.resource('guide', 'mcp://guide', async (uri) => {
       return {
         contents: [
@@ -193,7 +207,7 @@ export class DappierMCP {
         ]
       }
     })
-    
+
     this.server.tool(
       'create-account-and-login',
       `Having an account with Dappier is mandatory to access its tools. This tool creates account for current buyer agent 
@@ -254,8 +268,8 @@ export class DappierMCP {
             }
           ]
         }
-      }
-    ))
+      })
+    )
 
     this.server.tool(
       'get-pricing',
@@ -280,8 +294,8 @@ export class DappierMCP {
             }
           ]
         }
-      }
-    ))
+      })
+    )
 
     this.server.tool(
       'download-dataset',
@@ -293,12 +307,10 @@ export class DappierMCP {
           .string()
           .describe('Access token required to access and execute this tool'),
         datasetId: z.number().describe('ID for chosen dataset'),
-        payToken: z
-          .string()
-          .describe(
-            `PAY token (JWT) generated by Skyfire 
+        payToken: z.string().describe(
+          `PAY token (JWT) generated by Skyfire 
             for verifying and claiming payment`
-          )
+        )
       },
 
       this.withAuth(async ({ accessToken, datasetId, payToken }) => {
@@ -347,7 +359,7 @@ export class DappierMCP {
             }
           ]
         }
-      }
-    ))
+      })
+    )
   }
 }

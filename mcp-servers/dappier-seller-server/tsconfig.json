@@ -2,7 +2,7 @@
   "extends": "@skyfire-xyz/tsconfig/node20.json",
   "ts-node": {
     "transpileOnly": true,
-    "files": false,
+    "files": false
   },
   "compilerOptions": {
     "strict": true,
@@ -18,16 +18,10 @@
     "emitDecoratorMetadata": true,
     "sourceMap": true,
     "forceConsistentCasingInFileNames": true,
-    "lib": [
-      "esnext",
-    ],
+    "lib": ["esnext"],
     "resolveJsonModule": true,
-    "types": [
-      "node",
-      "express",
-      "pino"
-    ],
-    "baseUrl": "./",
+    "types": ["node", "express", "pino"],
+    "baseUrl": "./"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules"]

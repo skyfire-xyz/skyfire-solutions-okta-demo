@@ -59,13 +59,13 @@ export async function handleMcpMessageUnsafe(
     // for existing sessions, get the ID from the header
     const sessionId = req.headers['mcp-session-id']
     if (sessionId === undefined) {
-        res
-          .status(401)
-          .header(
-            'www-authenticate',
-            `resource_metadata=${RESOURCE_METADATA_URL}/.well-known/oauth-protected-resource`
-          )
-        return
+      res
+        .status(401)
+        .header(
+          'www-authenticate',
+          `resource_metadata=${RESOURCE_METADATA_URL}/.well-known/oauth-protected-resource`
+        )
+      return
     }
     if (typeof sessionId !== 'string') {
       res.status(400).json({

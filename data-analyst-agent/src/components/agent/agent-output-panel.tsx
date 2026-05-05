@@ -47,7 +47,7 @@ function ResponseTab({ parsedOutput }: TabContentProps) {
               parsedOutput.text ||
                 parsedOutput.response ||
                 parsedOutput.finalOutput ||
-                parsedOutput.output
+                parsedOutput.output,
             )}
           </MemoizedReactMarkdown>
         </div>
@@ -174,7 +174,7 @@ export function OutputPanel({
       timer = setInterval(() => setElapsedTime((prev) => prev + 1), 1000);
       msTimer = setInterval(
         () => setMilliseconds((prev) => (prev + 10) % 1000),
-        10
+        10,
       );
     }
 
@@ -247,7 +247,7 @@ export function OutputPanel({
       className={cn(
         "flex flex-col min-h-0 overflow-hidden bg-muted",
         "h-full w-full",
-        "md:w-1/2 lg:w-4/5"
+        "md:w-1/2 lg:w-4/5",
       )}
     >
       {/* Header with Indicators */}

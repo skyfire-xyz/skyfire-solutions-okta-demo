@@ -9,7 +9,9 @@ export function AgentHeader() {
         </div>
         <span className="text-xs text-[#D4D4D8] hidden lg:block">|</span>
         <h1 className="text-xs font-bold tracking-tight inline-flex items-center gap-1">
-          <span className="hidden lg:block">Data Commerce Transaction - Agent built on Vercel</span>
+          <span className="hidden lg:block">
+            Data Commerce Transaction - Agent built on Vercel
+          </span>
         </h1>
       </div>
     </motion.header>
