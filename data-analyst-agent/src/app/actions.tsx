@@ -75,7 +75,7 @@ const textConfig: { [key: string]: string } = {
 const connectMcpServerTool = {
   "connect-mcp-server-tool": {
     description:
-      "Connects to the seller MCP server URL. After calling this tool, stop agent exection immediately after.",
+      "Connects to the seller MCP server URL. After calling this tool, stop agent execution immediately after.",
     parameters: jsonSchema({
       type: "object",
       properties: {
@@ -115,10 +115,8 @@ export async function getAgent(
   input: string | Record<string, string>,
   agentContext: AgentContext,
 ) {
-  console.log("apiKey", apiKey);
   if (!apiKey) apiKey = process.env.SKYFIRE_API_KEY || "";
 
-  console.log("apiKey", apiKey);
   // set default agent context having SKYFIRE and VISUALIZATION MCP servers
   if (!agentContext || Object.keys(agentContext).length === 0) {
     agentContext = {

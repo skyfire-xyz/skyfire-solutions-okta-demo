@@ -5,6 +5,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import jwt, { JwtHeader, SigningKeyCallback } from 'jsonwebtoken'
 import jwksClient from 'jwks-rsa'
 import { config } from '../config'
+import logger from '../logger'
+import crypto from 'crypto'
 
 const skyfireSellerApiKey = config.get('skyfireSellerApiKey')
 const auth0Url = config.get('auth0Url')
@@ -23,6 +25,40 @@ const client = jwksClient({
   jwksRequestsPerMinute: 10
 })
 
+function extractJwt(tokenLike: string): string | null {
+  if (typeof tokenLike !== 'string') return null
+  const match = tokenLike.match(
+    /eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/
+  )
+  return match?.[0] ?? null
+}
+
+function tokenDebugFingerprint(tokenLike: string): {
+  sha256_12: string
+  parts: number[]
+  length: number
+  sampleStart: string
+  sampleEnd: string
+} {
+  const token = tokenLike ?? ''
+  const parts = token.split('.').map((p) => p.length)
+  // Avoid logging full secrets. Provide a short fingerprint + tiny prefix/suffix.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const sha256_12 = crypto
+    .createHash('sha256')
+    .update(token)
+    .digest('hex')
+    .slice(0, 12)
+
+  return {
+    sha256_12,
+    parts,
+    length: token.length,
+    sampleStart: token.slice(0, 12),
+    sampleEnd: token.slice(-12)
+  }
+}
+
 function getKey(header: JwtHeader, callback: SigningKeyCallback) {
   client.getSigningKey(header.kid as string, (err, key) => {
     if (err) {
@@ -38,9 +74,37 @@ async function validateAuth0Token(
   accessToken: string
 ): Promise<{ valid: true; payload: any } | { valid: false; reason: string }> {
   return new Promise((resolve) => {
+    const extracted = extractJwt(accessToken)
+    if (!extracted) {
+      logger.debug(
+        { accessTokenDebug: tokenDebugFingerprint(accessToken) },
+        'Auth0 token validation failed: no JWT found in accessToken'
+      )
+      resolve({
+        valid: false,
+        reason: 'JWT error: accessToken did not contain a JWT'
+      })
+      return
+    }
+
+    if (extracted !== accessToken) {
+      logger.debug(
+        {
+          accessTokenDebug: tokenDebugFingerprint(accessToken),
+          extractedDebug: tokenDebugFingerprint(extracted)
+        },
+        'Auth0 token validation: sanitized accessToken (extracted JWT substring)'
+      )
+    } else {
+      logger.debug(
+        { accessTokenDebug: tokenDebugFingerprint(accessToken) },
+        'Auth0 token validation: accessToken appears to be a JWT'
+      )
+    }
+
     // Decode metadata for debugging invalid signature / issuer / audience mismatches.
     // This does NOT verify the token and intentionally avoids logging the full token.
-    const decoded = jwt.decode(accessToken, { complete: true }) as {
+    const decoded = jwt.decode(extracted, { complete: true }) as {
       header?: JwtHeader
       payload?: any
     } | null
@@ -52,7 +116,7 @@ async function validateAuth0Token(
     }
 
     jwt.verify(
-      accessToken,
+      extracted,
       getKey,
       {
         algorithms: ['RS256'],
