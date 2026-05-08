@@ -50,13 +50,10 @@ function tokenDebugFingerprint(tokenLike: string): {
   sha256_12: string
   parts: number[]
   length: number
-  sampleStart: string
-  sampleEnd: string
 } {
   const token = tokenLike ?? ''
   const parts = token.split('.').map((p) => p.length)
-  // Avoid logging full secrets. Provide a short fingerprint + tiny prefix/suffix.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // Avoid logging secrets. Provide a short, non-reversible fingerprint + structural metadata.
   const sha256_12 = crypto
     .createHash('sha256')
     .update(token)
@@ -66,14 +63,34 @@ function tokenDebugFingerprint(tokenLike: string): {
   return {
     sha256_12,
     parts,
-    length: token.length,
-    sampleStart: token.slice(0, 12),
-    sampleEnd: token.slice(-12)
+    length: token.length
   }
 }
 
 function getKey(header: JwtHeader, callback: SigningKeyCallback) {
-  const kid = header.kid as string
+  const kidRaw = header?.kid
+  const kid = typeof kidRaw === 'string' ? kidRaw.trim() : ''
+
+  if (!kid) {
+    const err = new Error(
+      'JWT header missing or invalid "kid" (expected non-empty string)'
+    )
+    logger.warn(
+      {
+        jwks: { uri: jwksUri },
+        tokenHeader: {
+          kid: kidRaw,
+          alg: header?.alg,
+          typ: header?.typ
+        },
+        err: { name: err.name, message: err.message }
+      },
+      'Auth0 JWKS: cannot retrieve signing key because token header kid is missing/invalid'
+    )
+    callback(err)
+    return
+  }
+
   logger.debug(
     {
       jwks: {
