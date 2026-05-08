@@ -18,12 +18,25 @@ const auth0ClientSecret = config.get('auth0ClientSecret')
 const datasetBaseUrl =
   'https://pub-303d212fa4df4073b8b38b3de4a72d89.r2.dev/Dappier'
 
+// Useful for signature/JWKS debugging without logging secrets.
+const jwksUri = `${auth0Url}/.well-known/jwks.json`
+
 const client = jwksClient({
-  jwksUri: `${auth0Url}/.well-known/jwks.json`,
+  jwksUri,
   cache: true,
   rateLimit: true,
   jwksRequestsPerMinute: 10
 })
+
+function publicKeyFingerprint(publicKeyPem: string): string {
+  // Provide a stable fingerprint to confirm which key we verified with.
+  // Do NOT log full public keys.
+  return crypto
+    .createHash('sha256')
+    .update(publicKeyPem)
+    .digest('hex')
+    .slice(0, 12)
+}
 
 function extractJwt(tokenLike: string): string | null {
   if (typeof tokenLike !== 'string') return null
@@ -60,12 +73,51 @@ function tokenDebugFingerprint(tokenLike: string): {
 }
 
 function getKey(header: JwtHeader, callback: SigningKeyCallback) {
-  client.getSigningKey(header.kid as string, (err, key) => {
+  const kid = header.kid as string
+  logger.debug(
+    {
+      jwks: {
+        uri: jwksUri,
+        cache: true,
+        rateLimit: true
+      },
+      tokenHeader: {
+        kid,
+        alg: header.alg,
+        typ: header.typ
+      }
+    },
+    'Auth0 JWKS: retrieving signing key'
+  )
+
+  client.getSigningKey(kid, (err, key) => {
     if (err) {
+      logger.warn(
+        {
+          jwks: { uri: jwksUri },
+          tokenHeader: { kid, alg: header.alg, typ: header.typ },
+          err: { name: err.name, message: err.message }
+        },
+        'Auth0 JWKS: failed to retrieve signing key'
+      )
       callback(err)
       return
     }
     const signingKey = key?.getPublicKey()
+
+    if (signingKey) {
+      logger.debug(
+        {
+          jwks: { uri: jwksUri },
+          tokenHeader: { kid, alg: header.alg, typ: header.typ },
+          signingKey: {
+            sha256_12: publicKeyFingerprint(signingKey)
+          }
+        },
+        'Auth0 JWKS: retrieved signing key'
+      )
+    }
+
     callback(null, signingKey)
   })
 }
@@ -74,6 +126,17 @@ async function validateAuth0Token(
   accessToken: string
 ): Promise<{ valid: true; payload: any } | { valid: false; reason: string }> {
   return new Promise((resolve) => {
+    logger.debug(
+      {
+        auth0: {
+          issuer: `${auth0Url}/`,
+          audience: auth0Audience,
+          jwksUri
+        }
+      },
+      'Auth0 token validation: verify configuration'
+    )
+
     const extracted = extractJwt(accessToken)
     if (!extracted) {
       logger.debug(
@@ -115,6 +178,20 @@ async function validateAuth0Token(
       aud: decoded?.payload?.aud
     }
 
+    logger.debug(
+      {
+        tokenMeta,
+        accessTokenDebug: tokenDebugFingerprint(accessToken),
+        extractedDebug: tokenDebugFingerprint(extracted),
+        auth0: {
+          issuer: `${auth0Url}/`,
+          audience: auth0Audience,
+          jwksUri
+        }
+      },
+      'Auth0 token validation: decoded token metadata'
+    )
+
     jwt.verify(
       extracted,
       getKey,
@@ -125,11 +202,31 @@ async function validateAuth0Token(
       },
       (err, decoded) => {
         if (err) {
+          logger.warn(
+            {
+              err: { name: err.name, message: err.message },
+              tokenMeta,
+              auth0: {
+                issuer: `${auth0Url}/`,
+                audience: auth0Audience,
+                jwksUri
+              }
+            },
+            'Auth0 token validation: jwt.verify failed'
+          )
+
           let reason = err.message || 'Invalid or unverifiable token'
-          if (err.name === 'TokenExpiredError') reason = 'Token expired'
-          if (err.name === 'JsonWebTokenError')
+          if (err.name === 'TokenExpiredError') {
+            reason = 'Token expired'
+          }
+
+          if (err.name === 'JsonWebTokenError') {
             reason = `JWT error: ${err.message}`
-          if (err.name === 'NotBeforeError') reason = 'Token not active yet'
+          }
+
+          if (err.name === 'NotBeforeError') {
+            reason = 'Token not active yet'
+          }
 
           reason = `${reason} (tokenMeta=${JSON.stringify(tokenMeta)})`
 
