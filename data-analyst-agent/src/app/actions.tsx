@@ -13,6 +13,7 @@ import { jwtDecode } from "jwt-decode";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { isJWT } from "@/lib/utils";
+import crypto from "crypto";
 
 const vercelModel = openai("gpt-5.4", { structuredOutputs: true });
 const modelWithTracing = wrapAISDKModel(vercelModel);
@@ -52,6 +53,25 @@ function extractJwtFromText(text: string): string {
     /eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/,
   );
   return (jwtMatch?.[0] || "").trim();
+}
+
+function tokenFingerprint(tokenLike: string): {
+  sha256_12: string;
+  parts: number[];
+  length: number;
+} {
+  const token = tokenLike ?? "";
+  const parts = token.split(".").map((p) => p.length);
+  const sha256_12 = crypto
+    .createHash("sha256")
+    .update(token, "utf8")
+    .digest("hex")
+    .slice(0, 12);
+  return {
+    sha256_12,
+    parts: parts.length === 3 ? parts : [],
+    length: token.length,
+  };
 }
 
 // Use the SDK's types directly
@@ -283,8 +303,7 @@ function makeTransport(url: string, headers: Record<string, string>) {
 }
 
 const prepareAllTools = async (agentContext: AgentContext) => {
-  // eslint-disable-next-line
-  const clients: Record<string, any> = {};
+  const clients: Record<string, unknown> = {};
 
   const allServers = [
     ...(agentContext?.available_mcp_servers ?? []),
@@ -306,7 +325,49 @@ const prepareAllTools = async (agentContext: AgentContext) => {
       clients[localVar] = toolClient;
 
       const toolSet = await toolClient.tools();
-      allTools = { ...allTools, ...toolSet };
+      // Logging-only wrappers to prove whether the model is reusing a stale access token.
+      // These wrappers DO NOT modify args.
+      const wrappedToolSet: Record<string, unknown> = { ...toolSet };
+      const wrapTool = (toolName: string) => {
+        const orig = (wrappedToolSet as Record<string, unknown>)[toolName] as {
+          execute?: (args: unknown) => Promise<unknown>;
+        };
+
+        if (!orig?.execute) {
+          return;
+        }
+
+        const execute = orig.execute;
+
+        (wrappedToolSet as Record<string, unknown>)[toolName] = {
+          ...(orig as Record<string, unknown>),
+          execute: async (args: unknown) => {
+            const castedArgs = (args ?? {}) as Record<string, unknown>;
+            const accessToken =
+              typeof castedArgs.accessToken === "string"
+                ? (castedArgs.accessToken as string)
+                : "";
+            const extracted = accessToken
+              ? extractJwtFromText(accessToken)
+              : "";
+
+            const fp = extracted ? tokenFingerprint(extracted) : null;
+            console.warn(
+              `[buyer-token-proof] ${toolName} accessToken fingerprint:`,
+              fp,
+            );
+
+            return execute(args);
+          },
+        };
+      };
+
+      wrapTool("create-account-and-login");
+      wrapTool("search-dataset");
+      wrapTool("get-pricing");
+      wrapTool("download-dataset");
+
+      allTools = { ...allTools, ...wrappedToolSet };
 
       // ---- RESOURCES CLIENT ----
       const resourceTransport = makeTransport(server.url, server.headers);

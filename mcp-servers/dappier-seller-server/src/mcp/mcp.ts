@@ -450,8 +450,7 @@ export class DappierMCP {
             '\n'
         }
 
-        response =
-          response + '\nYour accessToken - ' + accessToken + ' is verified'
+        response = response + '\nAccess token verified.'
 
         return {
           content: [
@@ -483,7 +482,7 @@ export class DappierMCP {
           content: [
             {
               type: 'text' as const,
-              text: `Pricing for selected dataset ${datasetId} is ${res[0].price}. Your accessToken - ${accessToken} is verified`
+              text: `Pricing for selected dataset ${datasetId} is ${res[0].price}. Access token verified.`
             }
           ]
         }
@@ -538,7 +537,7 @@ export class DappierMCP {
             content: [
               {
                 type: 'text' as const,
-                text: `Purchased dataset ${datasetId}. Download from ${currentDataset[0].dataUrl}. Your accessToken - ${accessToken} is verified`
+                text: `Purchased dataset ${datasetId}. Download from ${currentDataset[0].dataUrl}. Access token verified.`
               }
             ]
           }
