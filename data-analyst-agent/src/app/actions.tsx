@@ -13,7 +13,6 @@ import { jwtDecode } from "jwt-decode";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { isJWT } from "@/lib/utils";
-import crypto from "crypto";
 
 const vercelModel = openai("gpt-5.4", { structuredOutputs: true });
 const modelWithTracing = wrapAISDKModel(vercelModel);
@@ -46,31 +45,6 @@ interface DecodedJWTResult {
   jwtDecoded: unknown;
   isValidJWT: boolean;
   debug?: { responseSample: string };
-}
-
-type TokenFingerprint = {
-  sha256_12: string;
-  parts: number[];
-  length: number;
-};
-
-type AgentSession = {
-  dappierAccessToken?: string;
-};
-
-function tokenFingerprint(tokenLike: string): TokenFingerprint {
-  const token = tokenLike ?? "";
-  const parts = token.split(".").map((p) => p.length);
-  const sha256_12 = crypto
-    .createHash("sha256")
-    .update(token, "utf8")
-    .digest("hex")
-    .slice(0, 12);
-  return {
-    sha256_12,
-    parts: parts.length === 3 ? parts : [],
-    length: token.length,
-  };
 }
 
 function extractJwtFromText(text: string): string {
@@ -190,14 +164,6 @@ async function runAgent(
   // eslint-disable-next-line prefer-const
   let allTools = await prepareAllTools(agentContext);
 
-  // Persist the Dappier access token in agentContext so reruns (after connecting MCP servers)
-  // don't accidentally swap tokens.
-  const ctx = agentContext as AgentContext & { session?: AgentSession };
-  if (!ctx.session) ctx.session = {};
-  const session = ctx.session;
-
-  let pinnedDappierAccessToken: string = session.dappierAccessToken || "";
-
   // add user prompt to agentContext
   agentContext.conversation_history.push({
     role: "user",
@@ -221,69 +187,6 @@ async function runAgent(
     maxSteps: 20,
     messages: agentContext.conversation_history,
   });
-
-  // 1) Capture the access token from create-account-and-login results.
-  // 2) Force subsequent Dappier tool calls to use the same pinned token.
-  //
-  // This prevents the model from accidentally reusing an old/echoed token.
-  for (const step of steps) {
-    if (!step.toolCalls?.length) continue;
-    for (let i = 0; i < step.toolCalls.length; i++) {
-      const toolCall = step.toolCalls[i] as unknown as ToolCall;
-      const toolResult = step.toolResults[i] as unknown as ToolResult;
-
-      if (toolCall?.toolName === "create-account-and-login") {
-        const resultText = toolResult?.result?.content?.[0]?.text || "";
-        const extracted = extractJwtFromText(resultText);
-        if (extracted && isJWT(extracted)) {
-          pinnedDappierAccessToken = extracted;
-          session.dappierAccessToken = pinnedDappierAccessToken;
-          console.warn(
-            "Pinned Dappier access token (fingerprint only):",
-            tokenFingerprint(pinnedDappierAccessToken),
-          );
-        } else {
-          console.warn(
-            "Could not pin Dappier access token from create-account-and-login result (sample):",
-            resultText.slice(0, 160),
-          );
-        }
-      }
-
-      if (
-        pinnedDappierAccessToken &&
-        (toolCall?.toolName === "search-dataset" ||
-          toolCall?.toolName === "get-pricing" ||
-          toolCall?.toolName === "download-dataset")
-      ) {
-        const provided = toolCall.args?.accessToken;
-        const providedJwt = provided ? extractJwtFromText(provided) : "";
-        const providedFp = providedJwt ? tokenFingerprint(providedJwt) : null;
-        const pinnedFp = tokenFingerprint(pinnedDappierAccessToken);
-
-        if (providedJwt && providedJwt !== pinnedDappierAccessToken) {
-          console.warn(
-            `Overriding ${toolCall.toolName} accessToken. providedFp=`,
-            providedFp,
-            "pinnedFp=",
-            pinnedFp,
-          );
-        } else {
-          console.warn(
-            `Using pinned accessToken for ${toolCall.toolName}. pinnedFp=`,
-            pinnedFp,
-          );
-        }
-
-        // Mutate the tool call args so the executed call uses the pinned token.
-        // ToolCall.args is a plain object coming from the SDK; this is safe.
-        toolCall.args = {
-          ...toolCall.args,
-          accessToken: pinnedDappierAccessToken,
-        };
-      }
-    }
-  }
 
   // Update agentContext to include all the executed steps
   agentContext.conversation_history.push(...response.messages);
