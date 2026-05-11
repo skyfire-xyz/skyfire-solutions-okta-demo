@@ -38,6 +38,17 @@ function publicKeyFingerprint(publicKeyPem: string): string {
     .slice(0, 12)
 }
 
+function jwkFingerprintNThenE(jwk: { n?: string; e?: string }): string | null {
+  // Fingerprints the underlying RSA key material from a JWK (non-reversible hash).
+  // Helpful to detect inconsistent key material served for the same kid.
+  if (!jwk?.n || !jwk?.e) return null
+  return crypto
+    .createHash('sha256')
+    .update(`${jwk.n}.${jwk.e}`)
+    .digest('hex')
+    .slice(0, 12)
+}
+
 function extractJwt(tokenLike: string): string | null {
   if (typeof tokenLike !== 'string') return null
   const match = tokenLike.match(
@@ -121,6 +132,9 @@ function getKey(header: JwtHeader, callback: SigningKeyCallback) {
       return
     }
     const signingKey = key?.getPublicKey()
+    // jwks-rsa SigningKey may expose the JWK via "key" (type varies); access defensively.
+    const maybeJwk = (key as any)?.key as { n?: string; e?: string } | undefined
+    const jwkNeSha = maybeJwk ? jwkFingerprintNThenE(maybeJwk) : null
 
     if (signingKey) {
       logger.debug(
@@ -128,7 +142,8 @@ function getKey(header: JwtHeader, callback: SigningKeyCallback) {
           jwks: { uri: jwksUri },
           tokenHeader: { kid, alg: header.alg, typ: header.typ },
           signingKey: {
-            sha256_12: publicKeyFingerprint(signingKey)
+            pem_sha256_12: publicKeyFingerprint(signingKey),
+            jwk_ne_sha256_12: jwkNeSha
           }
         },
         'Auth0 JWKS: retrieved signing key'
