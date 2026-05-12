@@ -49,6 +49,19 @@ function jwkFingerprintNThenE(jwk: { n?: string; e?: string }): string | null {
     .slice(0, 12)
 }
 
+function jwkFingerprintFromPem(publicKeyPem: string): string | null {
+  // Prefer deriving JWK material from the PEM itself; this is stable regardless of jwks-rsa key object shape.
+  try {
+    const jwk = crypto
+      .createPublicKey(publicKeyPem)
+      // Node returns JsonWebKey which should contain n/e for RSA.
+      .export({ format: 'jwk' }) as unknown as { n?: string; e?: string }
+    return jwkFingerprintNThenE(jwk)
+  } catch {
+    return null
+  }
+}
+
 function extractJwkFromSigningKey(
   key: unknown
 ): { n?: string; e?: string } | null {
@@ -164,7 +177,9 @@ function getKey(header: JwtHeader, callback: SigningKeyCallback) {
     }
     const signingKey = key?.getPublicKey()
     const maybeJwk = extractJwkFromSigningKey(key as unknown)
-    const jwkNeSha = maybeJwk ? jwkFingerprintNThenE(maybeJwk) : null
+    const jwkNeSha =
+      (maybeJwk ? jwkFingerprintNThenE(maybeJwk) : null) ??
+      (signingKey ? jwkFingerprintFromPem(signingKey) : null)
 
     if (signingKey) {
       logger.debug(
