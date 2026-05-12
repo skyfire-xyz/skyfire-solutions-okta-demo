@@ -7,6 +7,19 @@ import jwksClient from 'jwks-rsa'
 import { config } from '../config'
 import logger from '../logger'
 import crypto from 'crypto'
+import {
+  extractJwkFromSigningKey,
+  extractJwt,
+  getKeyForIssuer as getKeyForIssuerImpl,
+  jwkFingerprintFromPem,
+  jwkFingerprintNThenE,
+  normalizeIssuer,
+  normalizeTokenLike,
+  publicKeyFingerprint,
+  tokenDebugFingerprint,
+  tokenSegmentFingerprints,
+  type SigningKeyFingerprints
+} from './utils'
 
 const skyfireSellerApiKey = config.get('skyfireSellerApiKey')
 const auth0Url = config.get('auth0Url')
@@ -21,6 +34,7 @@ const datasetBaseUrl =
 // Useful for signature/JWKS debugging without logging secrets.
 const jwksUri = `${auth0Url}/.well-known/jwks.json`
 
+// Default jwks-rsa client derived from configured AUTH0_URL.
 const client = jwksClient({
   jwksUri,
   cache: true,
@@ -30,106 +44,25 @@ const client = jwksClient({
 
 // Last key fingerprints seen during verification. This is used for logging-only correlation
 // in jwt.verify failure logs (so we can compare failing tokens to the key material used).
-let lastSigningKeyFingerprints: {
-  pem_sha256_12: string
-  jwk_ne_sha256_12: string | null
-} | null = null
+let lastSigningKeyFingerprints: SigningKeyFingerprints | null = null
 
-function publicKeyFingerprint(publicKeyPem: string): string {
-  // Provide a stable fingerprint to confirm which key we verified with.
-  // Do NOT log full public keys.
-  return crypto
-    .createHash('sha256')
-    .update(publicKeyPem)
-    .digest('hex')
-    .slice(0, 12)
-}
-
-function jwkFingerprintNThenE(jwk: { n?: string; e?: string }): string | null {
-  // Fingerprints the underlying RSA key material from a JWK (non-reversible hash).
-  // Helpful to detect inconsistent key material served for the same kid.
-  if (!jwk?.n || !jwk?.e) return null
-  return crypto
-    .createHash('sha256')
-    .update(`${jwk.n}.${jwk.e}`)
-    .digest('hex')
-    .slice(0, 12)
-}
-
-function jwkFingerprintFromPem(publicKeyPem: string): string | null {
-  // Prefer deriving JWK material from the PEM itself; this is stable regardless of jwks-rsa key object shape.
-  try {
-    const jwk = crypto
-      .createPublicKey(publicKeyPem)
-      // Node returns JsonWebKey which should contain n/e for RSA.
-      .export({ format: 'jwk' }) as unknown as { n?: string; e?: string }
-    return jwkFingerprintNThenE(jwk)
-  } catch {
-    return null
-  }
-}
-
-function extractJwkFromSigningKey(
-  key: unknown
-): { n?: string; e?: string } | null {
-  // jwks-rsa can return different key shapes depending on version + Node crypto.
-  // We try a few known locations for the underlying RSA JWK.
-  if (!key || typeof key !== 'object') return null
-
-  const k = key as Record<string, unknown>
-
-  // Newer jwks-rsa exposes the raw JWK under `key`.
-  const direct = k.key
-  if (direct && typeof direct === 'object') {
-    const jwk = direct as { n?: string; e?: string }
-    if (typeof jwk.n === 'string' && typeof jwk.e === 'string') return jwk
-  }
-
-  // Some shapes expose JWK under `rsaPublicKey` / `publicKey`.
-  const maybeRsa = k.rsaPublicKey
-  if (maybeRsa && typeof maybeRsa === 'object') {
-    const jwk = maybeRsa as { n?: string; e?: string }
-    if (typeof jwk.n === 'string' && typeof jwk.e === 'string') return jwk
-  }
-  const maybePub = k.publicKey
-  if (maybePub && typeof maybePub === 'object') {
-    const jwk = maybePub as { n?: string; e?: string }
-    if (typeof jwk.n === 'string' && typeof jwk.e === 'string') return jwk
-  }
-
-  return null
-}
-
-function extractJwt(tokenLike: string): string | null {
-  if (typeof tokenLike !== 'string') return null
-  const match = tokenLike.match(
-    /eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/
-  )
-  return match?.[0] ?? null
-}
-
-function tokenDebugFingerprint(tokenLike: string): {
-  sha256_12: string
-  parts: number[]
-  length: number
-} {
-  const token = tokenLike ?? ''
-  const parts = token.split('.').map((p) => p.length)
-  // Avoid logging secrets. Provide a short, non-reversible fingerprint + structural metadata.
-  const sha256_12 = crypto
-    .createHash('sha256')
-    .update(token)
-    .digest('hex')
-    .slice(0, 12)
-
-  return {
-    sha256_12,
-    parts,
-    length: token.length
-  }
-}
+const getKeyForIssuerWithTracking = (
+  issuer: string,
+  header: JwtHeader,
+  callback: SigningKeyCallback
+) =>
+  getKeyForIssuerImpl({
+    issuer,
+    header,
+    callback,
+    setLastSigningKeyFingerprints: (fp: SigningKeyFingerprints | null) => {
+      lastSigningKeyFingerprints = fp
+    }
+  })
 
 function getKey(header: JwtHeader, callback: SigningKeyCallback) {
+  // Uses the configured jwksUri from AUTH0_URL. For issuer-derived verification,
+  // use getKeyForIssuer.
   const kidRaw = header?.kid
   const kid = typeof kidRaw === 'string' ? kidRaw.trim() : ''
 
@@ -218,22 +151,30 @@ async function validateAuth0Token(
   return new Promise((resolve) => {
     const mcpSessionId = opts?.mcpSessionId
 
+    const normalizedAccessToken = normalizeTokenLike(accessToken)
+
     logger.debug(
       {
         mcpSessionId,
         auth0: {
-          issuer: `${auth0Url}/`,
-          audience: auth0Audience,
-          jwksUri
+          configuredIssuer: `${auth0Url}/`,
+          configuredAudience: auth0Audience,
+          configuredJwksUri: jwksUri
         }
       },
-      'Auth0 token validation: verify configuration'
+      'Auth0 token validation: verify configuration (configured)'
     )
 
-    const extracted = extractJwt(accessToken)
+    const extracted = extractJwt(normalizedAccessToken)
     if (!extracted) {
       logger.debug(
-        { mcpSessionId, accessTokenDebug: tokenDebugFingerprint(accessToken) },
+        {
+          mcpSessionId,
+          accessTokenDebug: tokenDebugFingerprint(accessToken),
+          normalizedAccessTokenDebug: tokenDebugFingerprint(
+            normalizedAccessToken
+          )
+        },
         'Auth0 token validation failed: no JWT found in accessToken'
       )
       resolve({
@@ -243,18 +184,27 @@ async function validateAuth0Token(
       return
     }
 
-    if (extracted !== accessToken) {
+    if (extracted !== normalizedAccessToken) {
       logger.debug(
         {
           mcpSessionId,
           accessTokenDebug: tokenDebugFingerprint(accessToken),
+          normalizedAccessTokenDebug: tokenDebugFingerprint(
+            normalizedAccessToken
+          ),
           extractedDebug: tokenDebugFingerprint(extracted)
         },
         'Auth0 token validation: sanitized accessToken (extracted JWT substring)'
       )
     } else {
       logger.debug(
-        { mcpSessionId, accessTokenDebug: tokenDebugFingerprint(accessToken) },
+        {
+          mcpSessionId,
+          accessTokenDebug: tokenDebugFingerprint(accessToken),
+          normalizedAccessTokenDebug: tokenDebugFingerprint(
+            normalizedAccessToken
+          )
+        },
         'Auth0 token validation: accessToken appears to be a JWT'
       )
     }
@@ -272,16 +222,36 @@ async function validateAuth0Token(
       aud: decoded?.payload?.aud
     }
 
+    const issuerFromToken = normalizeIssuer(tokenMeta.iss)
+    const issuerToUse = issuerFromToken ?? `${auth0Url}/`
+    const jwksUriToUse = issuerFromToken
+      ? `${issuerToUse}.well-known/jwks.json`
+      : jwksUri
+
+    logger.info(
+      {
+        mcpSessionId,
+        auth0: {
+          issuerToUse,
+          jwksUriToUse,
+          audience: auth0Audience,
+          issuerSource: issuerFromToken ? 'token' : 'configured'
+        }
+      },
+      'Auth0 token validation: effective verify configuration'
+    )
+
     logger.debug(
       {
         mcpSessionId,
         tokenMeta,
         accessTokenDebug: tokenDebugFingerprint(accessToken),
+        accessTokenSegDebug: tokenSegmentFingerprints(extracted),
         extractedDebug: tokenDebugFingerprint(extracted),
         auth0: {
-          issuer: `${auth0Url}/`,
+          issuer: issuerToUse,
           audience: auth0Audience,
-          jwksUri
+          jwksUri: jwksUriToUse
         }
       },
       'Auth0 token validation: decoded token metadata'
@@ -289,10 +259,15 @@ async function validateAuth0Token(
 
     jwt.verify(
       extracted,
-      getKey,
+      (header: JwtHeader, callback: SigningKeyCallback) => {
+        if (issuerFromToken) {
+          return getKeyForIssuerWithTracking(issuerToUse, header, callback)
+        }
+        return getKey(header, callback)
+      },
       {
         algorithms: ['RS256'],
-        issuer: `${auth0Url}/`,
+        issuer: issuerToUse,
         audience: auth0Audience
       },
       (err, decoded) => {
@@ -304,9 +279,9 @@ async function validateAuth0Token(
               tokenMeta,
               signingKey: lastSigningKeyFingerprints,
               auth0: {
-                issuer: `${auth0Url}/`,
+                issuer: issuerToUse,
                 audience: auth0Audience,
-                jwksUri
+                jwksUri: jwksUriToUse
               }
             },
             'Auth0 token validation: jwt.verify failed'
@@ -445,6 +420,9 @@ const createAccountAndLoginWithAuth0 = async (
         mcpSessionId,
         minted: {
           accessTokenDebug: mintedFp,
+          accessTokenSegDebug: tokenSegmentFingerprints(
+            extracted || mintedAccessToken
+          ),
           tokenMeta: {
             kid: decodedMint?.header?.kid,
             alg: decodedMint?.header?.alg,
@@ -469,7 +447,8 @@ const createAccountAndLoginWithAuth0 = async (
         mcpSessionId,
         returnedToBuyerIsJwtLike: Boolean(extractJwt(mintedAccessToken)),
         returnedToBuyer: {
-          accessTokenDebug: returnedFp
+          accessTokenDebug: returnedFp,
+          accessTokenSegDebug: tokenSegmentFingerprints(mintedAccessToken)
         }
       },
       'Auth0 token mint: returning access token to buyer (fingerprint only)'
@@ -504,7 +483,9 @@ const createAccountAndLoginWithAuth0 = async (
     content: [
       {
         type: 'text' as const,
-        text: JSON.stringify(
+        // Include a plain accessToken line first to reduce any chance of JSON-string escaping
+        // issues in intermediate logs/agents; buyer can still prefer JSON parsing.
+        text: `accessToken=${mintedAccessToken}\n${JSON.stringify(
           {
             message: 'Account created',
             accessToken: mintedAccessToken,
@@ -513,7 +494,7 @@ const createAccountAndLoginWithAuth0 = async (
           },
           null,
           2
-        )
+        )}`
       }
     ]
   }
