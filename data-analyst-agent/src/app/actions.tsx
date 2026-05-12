@@ -48,6 +48,24 @@ interface DecodedJWTResult {
   debug?: { responseSample: string };
 }
 
+function extractAccessTokenFromToolText(text: string): string {
+  // Preferred: seller returns structured JSON (so we don't depend on prose formatting).
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    if (parsed && typeof parsed === "object") {
+      const maybe = (parsed as { accessToken?: unknown }).accessToken;
+      if (typeof maybe === "string" && maybe.length > 0) {
+        return maybe;
+      }
+    }
+  } catch {
+    // Not JSON, fall back.
+  }
+
+  // Back-compat: allow prose responses.
+  return extractJwtFromText(text);
+}
+
 function extractJwtFromText(text: string): string {
   const jwtMatch = text.match(
     /eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/,
@@ -249,7 +267,7 @@ const getDecodedJWT = (toolResult: ToolResult): DecodedJWTResult => {
   // Tokens in tool responses are human-readable strings like:
   // "Account created. Access token is <JWT>".
   // Don't rely on "last space-separated word" because the token may be followed by punctuation.
-  const token: string = extractJwtFromText(tokenRes);
+  const token: string = extractAccessTokenFromToolText(tokenRes);
   if (isJWT(token)) {
     const jwtHeader: string = jwtDecode(token, { header: true });
     const jwtPayload: string = jwtDecode(token);
