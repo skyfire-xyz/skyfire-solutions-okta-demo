@@ -212,11 +212,15 @@ function getKey(header: JwtHeader, callback: SigningKeyCallback) {
 }
 
 async function validateAuth0Token(
-  accessToken: string
+  accessToken: string,
+  opts?: { mcpSessionId?: string }
 ): Promise<{ valid: true; payload: any } | { valid: false; reason: string }> {
   return new Promise((resolve) => {
+    const mcpSessionId = opts?.mcpSessionId
+
     logger.debug(
       {
+        mcpSessionId,
         auth0: {
           issuer: `${auth0Url}/`,
           audience: auth0Audience,
@@ -229,7 +233,7 @@ async function validateAuth0Token(
     const extracted = extractJwt(accessToken)
     if (!extracted) {
       logger.debug(
-        { accessTokenDebug: tokenDebugFingerprint(accessToken) },
+        { mcpSessionId, accessTokenDebug: tokenDebugFingerprint(accessToken) },
         'Auth0 token validation failed: no JWT found in accessToken'
       )
       resolve({
@@ -242,6 +246,7 @@ async function validateAuth0Token(
     if (extracted !== accessToken) {
       logger.debug(
         {
+          mcpSessionId,
           accessTokenDebug: tokenDebugFingerprint(accessToken),
           extractedDebug: tokenDebugFingerprint(extracted)
         },
@@ -249,7 +254,7 @@ async function validateAuth0Token(
       )
     } else {
       logger.debug(
-        { accessTokenDebug: tokenDebugFingerprint(accessToken) },
+        { mcpSessionId, accessTokenDebug: tokenDebugFingerprint(accessToken) },
         'Auth0 token validation: accessToken appears to be a JWT'
       )
     }
@@ -269,6 +274,7 @@ async function validateAuth0Token(
 
     logger.debug(
       {
+        mcpSessionId,
         tokenMeta,
         accessTokenDebug: tokenDebugFingerprint(accessToken),
         extractedDebug: tokenDebugFingerprint(extracted),
@@ -293,6 +299,7 @@ async function validateAuth0Token(
         if (err) {
           logger.warn(
             {
+              mcpSessionId,
               err: { name: err.name, message: err.message },
               tokenMeta,
               signingKey: lastSigningKeyFingerprints,
@@ -332,11 +339,14 @@ async function validateAuth0Token(
 
 const createAccountAndLoginWithAuth0 = async (
   kyaToken: string,
-  resToken: string
+  resToken: string,
+  opts?: { mcpSessionId?: string }
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 ) => {
+  const mcpSessionId = opts?.mcpSessionId
   logger.debug(
     {
+      mcpSessionId,
       auth0: {
         tokenEndpoint: `${auth0Url}/oauth/token`,
         audience: auth0Audience,
@@ -380,10 +390,12 @@ const createAccountAndLoginWithAuth0 = async (
       header?: JwtHeader
       payload?: any
     } | null
+    const mintedFp = tokenDebugFingerprint(extracted || token)
     logger.debug(
       {
+        mcpSessionId,
         minted: {
-          accessTokenDebug: tokenDebugFingerprint(extracted || token),
+          accessTokenDebug: mintedFp,
           tokenMeta: {
             kid: decodedMint?.header?.kid,
             alg: decodedMint?.header?.alg,
@@ -399,9 +411,34 @@ const createAccountAndLoginWithAuth0 = async (
       },
       'Auth0 token mint: received access token (fingerprint only)'
     )
+
+    // Correlate what we minted with what we actually return to the buyer agent.
+    // (In practice these should be identical, but this catches subtle string/flow issues.)
+    const returnedFp = tokenDebugFingerprint(resToken)
+    logger.debug(
+      {
+        mcpSessionId,
+        returnedToBuyer: {
+          accessTokenDebug: returnedFp
+        }
+      },
+      'Auth0 token mint: returning access token to buyer (fingerprint only)'
+    )
+
+    if (mintedFp.sha256_12 !== returnedFp.sha256_12) {
+      logger.warn(
+        {
+          mcpSessionId,
+          minted: mintedFp,
+          returnedToBuyer: returnedFp
+        },
+        'Auth0 token mint: minted token differs from returned token (fingerprint mismatch)'
+      )
+    }
   } catch (e) {
     logger.warn(
       {
+        mcpSessionId,
         err: {
           name: e instanceof Error ? e.name : 'UnknownError',
           message: e instanceof Error ? e.message : String(e)
@@ -436,7 +473,13 @@ export class DappierMCP {
     return async (args: any, extra?: any) => {
       const { accessToken } = args
 
-      const validation = await validateAuth0Token(accessToken)
+      const mcpSessionIdRaw =
+        (extra?.req?.headers?.['mcp-session-id'] as string | undefined) ??
+        (extra?.req?.headers?.['MCP-Session-Id'] as string | undefined)
+      const mcpSessionId =
+        typeof mcpSessionIdRaw === 'string' ? mcpSessionIdRaw : undefined
+
+      const validation = await validateAuth0Token(accessToken, { mcpSessionId })
 
       if (!validation.valid) {
         return {
@@ -532,6 +575,10 @@ export class DappierMCP {
         )
       },
       async ({ kyaToken, password }) => {
+        // The MCP SDK provides request context as the `extra` argument on tool calls.
+        // We capture the server-side MCP session id for log correlation.
+        // NOTE: extra isn't available here because this tool handler signature only provides args.
+        // Correlation for this tool is handled in the upstream transport logs.
         return createAccountAndLoginWithAuth0(kyaToken, password)
       }
     )
