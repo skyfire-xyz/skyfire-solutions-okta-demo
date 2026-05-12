@@ -28,6 +28,13 @@ const client = jwksClient({
   jwksRequestsPerMinute: 10
 })
 
+// Last key fingerprints seen during verification. This is used for logging-only correlation
+// in jwt.verify failure logs (so we can compare failing tokens to the key material used).
+let lastSigningKeyFingerprints: {
+  pem_sha256_12: string
+  jwk_ne_sha256_12: string | null
+} | null = null
+
 function publicKeyFingerprint(publicKeyPem: string): string {
   // Provide a stable fingerprint to confirm which key we verified with.
   // Do NOT log full public keys.
@@ -182,13 +189,18 @@ function getKey(header: JwtHeader, callback: SigningKeyCallback) {
       (signingKey ? jwkFingerprintFromPem(signingKey) : null)
 
     if (signingKey) {
+      lastSigningKeyFingerprints = {
+        pem_sha256_12: publicKeyFingerprint(signingKey),
+        jwk_ne_sha256_12: jwkNeSha
+      }
+
       logger.debug(
         {
           jwks: { uri: jwksUri },
           tokenHeader: { kid, alg: header.alg, typ: header.typ },
           signingKey: {
-            pem_sha256_12: publicKeyFingerprint(signingKey),
-            jwk_ne_sha256_12: jwkNeSha
+            pem_sha256_12: lastSigningKeyFingerprints.pem_sha256_12,
+            jwk_ne_sha256_12: lastSigningKeyFingerprints.jwk_ne_sha256_12
           }
         },
         'Auth0 JWKS: retrieved signing key'
@@ -283,6 +295,7 @@ async function validateAuth0Token(
             {
               err: { name: err.name, message: err.message },
               tokenMeta,
+              signingKey: lastSigningKeyFingerprints,
               auth0: {
                 issuer: `${auth0Url}/`,
                 audience: auth0Audience,
@@ -310,6 +323,7 @@ async function validateAuth0Token(
           resolve({ valid: false, reason })
           return
         }
+
         resolve({ valid: true, payload: decoded })
       }
     )
@@ -321,6 +335,20 @@ const createAccountAndLoginWithAuth0 = async (
   resToken: string
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 ) => {
+  logger.debug(
+    {
+      auth0: {
+        tokenEndpoint: `${auth0Url}/oauth/token`,
+        audience: auth0Audience,
+        clientIdSuffix:
+          typeof auth0ClientId === 'string' && auth0ClientId.length >= 6
+            ? auth0ClientId.slice(-6)
+            : 'unknown'
+      }
+    },
+    'Auth0 token mint: requesting access token'
+  )
+
   const auth = await fetch(`${auth0Url}/oauth/token`, {
     method: 'POST',
     headers: {
@@ -341,6 +369,46 @@ const createAccountAndLoginWithAuth0 = async (
     expires_in: number
     token_type: string
     issued_token_type: string
+  }
+
+  // Logging-only: fingerprint and decode the minted token to ensure it aligns with the
+  // expected issuer/audience/kid, without logging the raw token.
+  try {
+    const token = authRes?.access_token ?? ''
+    const extracted = extractJwt(token) ?? ''
+    const decodedMint = jwt.decode(extracted, { complete: true }) as {
+      header?: JwtHeader
+      payload?: any
+    } | null
+    logger.debug(
+      {
+        minted: {
+          accessTokenDebug: tokenDebugFingerprint(extracted || token),
+          tokenMeta: {
+            kid: decodedMint?.header?.kid,
+            alg: decodedMint?.header?.alg,
+            iss: decodedMint?.payload?.iss,
+            aud: decodedMint?.payload?.aud
+          }
+        },
+        auth0: {
+          tokenEndpoint: `${auth0Url}/oauth/token`,
+          issuer: `${auth0Url}/`,
+          audience: auth0Audience
+        }
+      },
+      'Auth0 token mint: received access token (fingerprint only)'
+    )
+  } catch (e) {
+    logger.warn(
+      {
+        err: {
+          name: e instanceof Error ? e.name : 'UnknownError',
+          message: e instanceof Error ? e.message : String(e)
+        }
+      },
+      'Auth0 token mint: failed to decode minted access token for debugging'
+    )
   }
 
   resToken = authRes.access_token
