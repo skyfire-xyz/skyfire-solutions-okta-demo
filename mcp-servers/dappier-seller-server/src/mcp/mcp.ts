@@ -49,6 +49,37 @@ function jwkFingerprintNThenE(jwk: { n?: string; e?: string }): string | null {
     .slice(0, 12)
 }
 
+function extractJwkFromSigningKey(
+  key: unknown
+): { n?: string; e?: string } | null {
+  // jwks-rsa can return different key shapes depending on version + Node crypto.
+  // We try a few known locations for the underlying RSA JWK.
+  if (!key || typeof key !== 'object') return null
+
+  const k = key as Record<string, unknown>
+
+  // Newer jwks-rsa exposes the raw JWK under `key`.
+  const direct = k.key
+  if (direct && typeof direct === 'object') {
+    const jwk = direct as { n?: string; e?: string }
+    if (typeof jwk.n === 'string' && typeof jwk.e === 'string') return jwk
+  }
+
+  // Some shapes expose JWK under `rsaPublicKey` / `publicKey`.
+  const maybeRsa = k.rsaPublicKey
+  if (maybeRsa && typeof maybeRsa === 'object') {
+    const jwk = maybeRsa as { n?: string; e?: string }
+    if (typeof jwk.n === 'string' && typeof jwk.e === 'string') return jwk
+  }
+  const maybePub = k.publicKey
+  if (maybePub && typeof maybePub === 'object') {
+    const jwk = maybePub as { n?: string; e?: string }
+    if (typeof jwk.n === 'string' && typeof jwk.e === 'string') return jwk
+  }
+
+  return null
+}
+
 function extractJwt(tokenLike: string): string | null {
   if (typeof tokenLike !== 'string') return null
   const match = tokenLike.match(
@@ -132,8 +163,7 @@ function getKey(header: JwtHeader, callback: SigningKeyCallback) {
       return
     }
     const signingKey = key?.getPublicKey()
-    // jwks-rsa SigningKey may expose the JWK via "key" (type varies); access defensively.
-    const maybeJwk = (key as any)?.key as { n?: string; e?: string } | undefined
+    const maybeJwk = extractJwkFromSigningKey(key as unknown)
     const jwkNeSha = maybeJwk ? jwkFingerprintNThenE(maybeJwk) : null
 
     if (signingKey) {
