@@ -17,7 +17,9 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import { agentTypes, examplePrompts, ExamplePrompt } from "@/lib/types";
 
 export function AgentSandbox() {
-  const [inputs, setInputs] = useState<Record<string, string>>({"prompt": examplePrompts["multi-step-tool-usage"][0].prompt});
+  const [inputs, setInputs] = useState<Record<string, string>>({
+    prompt: examplePrompts["multi-step-tool-usage"][0].prompt,
+  });
   const [selectedExampleIndex, setSelectedExampleIndex] = useState<
     number | null
   >(0);
@@ -28,7 +30,7 @@ export function AgentSandbox() {
     (typeof agentTypes)[number]["id"]
   >(agentTypes[0].id);
   const [inputHistory, setInputHistory] = useState<Record<string, string[]>>(
-    {}
+    {},
   );
   const [outputDrawerOpen, setOutputDrawerOpen] = useState(false);
   // const [secretDialogOpen, setSecretDialogOpen] = useState(false);
@@ -36,7 +38,7 @@ export function AgentSandbox() {
 
   const isMobile = useMediaQuery("(max-width: 768px)");
   const selectedAgentDetails = agentTypes.find(
-    (agent) => agent.id === selectedAgent
+    (agent) => agent.id === selectedAgent,
   );
   const currentAgentHistory = inputHistory[selectedAgent] || [];
 
@@ -56,10 +58,13 @@ export function AgentSandbox() {
   const handleExampleSelect = (example: ExamplePrompt, index: number) => {
     const definedInputs = Object.entries(example)
       .filter(([, value]) => value !== undefined)
-      .reduce((acc, [key, value]) => {
-        acc[key] = value as string; // Assert value is string after filtering undefined
-        return acc;
-      }, {} as Record<string, string>);
+      .reduce(
+        (acc, [key, value]) => {
+          acc[key] = value as string; // Assert value is string after filtering undefined
+          return acc;
+        },
+        {} as Record<string, string>,
+      );
     setInputs(definedInputs);
     setSelectedExampleIndex(index);
   };
@@ -139,7 +144,7 @@ export function AgentSandbox() {
   return (
     <div className="flex flex-col h-screen overflow-x-hidden">
       <AgentHeader />
-      
+
       <div className="flex-1 flex flex-col min-h-0 pb-4 bg-muted overflow-hidden relative">
         {/* <SecretDialog
           open={secretDialogOpen}

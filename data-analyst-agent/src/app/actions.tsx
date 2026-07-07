@@ -2,14 +2,20 @@
 
 import { openai } from "@ai-sdk/openai";
 import { wrapAISDKModel } from "langsmith/wrappers/vercel";
-import { generateText, experimental_createMCPClient, jsonSchema, type StepResult } from "ai";
+import {
+  generateText,
+  experimental_createMCPClient,
+  jsonSchema,
+  type StepResult,
+} from "ai";
 import { AgentContext } from "@/lib/types";
 import { jwtDecode } from "jwt-decode";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { isJWT } from "@/lib/utils";
+import crypto from "crypto";
 
-const vercelModel = openai("gpt-4o", { structuredOutputs: true });
+const vercelModel = openai("gpt-5.4", { structuredOutputs: true });
 const modelWithTracing = wrapAISDKModel(vercelModel);
 
 interface FormattedStep {
@@ -21,24 +27,75 @@ interface FormattedStep {
 }
 
 interface ToolCall {
-    type: string;
-    toolCallId: string;
-    toolName: string;
-    args: {
-      [key: string]: string;
-    }
+  type: string;
+  toolCallId: string;
+  toolName: string;
+  args: {
+    [key: string]: string;
+  };
 }
 
 interface ToolResult {
-    result: {
-        content: Array<{ type: string; text: string }>;
+  result: {
+    content: Array<{ type: string; text: string }>;
+  };
+}
+
+interface DecodedJWTResult {
+  token: string;
+  jwtDecoded: unknown;
+  isValidJWT: boolean;
+  debug?: { responseSample: string };
+}
+
+function extractAccessTokenFromToolText(text: string): string {
+  // Preferred: seller returns structured JSON (so we don't depend on prose formatting).
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    if (parsed && typeof parsed === "object") {
+      const maybe = (parsed as { accessToken?: unknown }).accessToken;
+      if (typeof maybe === "string" && maybe.length > 0) {
+        return maybe;
+      }
     }
+  } catch {
+    // Not JSON, fall back.
+  }
+
+  // Back-compat: allow prose responses.
+  return extractJwtFromText(text);
+}
+
+function extractJwtFromText(text: string): string {
+  const jwtMatch = text.match(
+    /eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/,
+  );
+  return (jwtMatch?.[0] || "").trim();
+}
+
+function tokenFingerprint(tokenLike: string): {
+  sha256_12: string;
+  parts: number[];
+  length: number;
+} {
+  const token = tokenLike ?? "";
+  const parts = token.split(".").map((p) => p.length);
+  const sha256_12 = crypto
+    .createHash("sha256")
+    .update(token, "utf8")
+    .digest("hex")
+    .slice(0, 12);
+  return {
+    sha256_12,
+    parts: parts.length === 3 ? parts : [],
+    length: token.length,
+  };
 }
 
 // Use the SDK's types directly
 type AIStep = StepResult<typeof connectMcpServerTool>;
 
-const textConfig: {[key:string]: string} = {
+const textConfig: { [key: string]: string } = {
   "find-sellers":
     "I will use Skyfire's find-sellers tool to find a seller for the requested data & retrieve the MCP server URL of the seller",
   "create-kya-token":
@@ -62,7 +119,8 @@ const textConfig: {[key:string]: string} = {
 
 const connectMcpServerTool = {
   "connect-mcp-server-tool": {
-    description: "Connects to the seller MCP server URL. After calling this tool, stop agent exection immediately after.",
+    description:
+      "Connects to the seller MCP server URL. After calling this tool, stop agent execution immediately after.",
     parameters: jsonSchema({
       type: "object",
       properties: {
@@ -78,7 +136,13 @@ const connectMcpServerTool = {
       required: ["mcpServerUrl", "sellerName"],
       additionalProperties: false,
     }),
-    execute: async ({ mcpServerUrl, sellerName }: { mcpServerUrl: string; sellerName: string }) => {
+    execute: async ({
+      mcpServerUrl,
+      sellerName,
+    }: {
+      mcpServerUrl: string;
+      sellerName: string;
+    }) => {
       return {
         content: [
           {
@@ -96,11 +160,8 @@ export async function getAgent(
   input: string | Record<string, string>,
   agentContext: AgentContext,
 ) {
-  console.log("apiKey", apiKey);
-  if(!apiKey)
-    apiKey = process.env.SKYFIRE_API_KEY || "";
+  if (!apiKey) apiKey = process.env.SKYFIRE_API_KEY || "";
 
-  console.log("apiKey", apiKey);
   // set default agent context having SKYFIRE and VISUALIZATION MCP servers
   if (!agentContext || Object.keys(agentContext).length === 0) {
     agentContext = {
@@ -118,8 +179,8 @@ export async function getAgent(
         {
           role: "system",
           content:
-            "You are an e-commerce buyer agent assisting user to make a purchase. When connect-mcp-server-tool tool is executed, you must stop agent execution immediately-- there should be no subsequent tools executed. Whenever there is a need to create an account, use 123456S$d#d as the password. Do not truncate or mutate tokens. Use the okta auth0 version of the service."
-            // For the scope of this demo, the agent is instructed to use a static password for account creation and login. As an improvisation in future, the agent could randomly generate a password and store in agent memory and also share it with human using secure password services like 1Password, Keeper etc.
+            "You are an e-commerce buyer agent assisting user to make a purchase. When connect-mcp-server-tool tool is executed, you must stop agent execution immediately-- there should be no subsequent tools executed. Whenever there is a need to create an account, use 123456S$d#d as the password. Do not truncate or mutate tokens. Use the okta auth0 version of the service.",
+          // For the scope of this demo, the agent is instructed to use a static password for account creation and login. As an improvisation in future, the agent could randomly generate a password and store in agent memory and also share it with human using secure password services like 1Password, Keeper etc.
         },
       ],
     };
@@ -135,7 +196,7 @@ async function runAgent(
   apiKey: string,
   input: string,
   agentContext: AgentContext,
-  initialFormattedSteps: FormattedStep[] = []
+  initialFormattedSteps: FormattedStep[] = [],
 ) {
   // Prepare tools from all the connected MCP servers
   // eslint-disable-next-line prefer-const
@@ -155,7 +216,11 @@ async function runAgent(
     response,
   } = await generateText({
     model: modelWithTracing,
-    maxTokens: 5000,
+    providerOptions: {
+      openai: {
+        maxCompletionTokens: 5000,
+      },
+    },
     tools: allTools,
     maxSteps: 20,
     messages: agentContext.conversation_history,
@@ -172,13 +237,13 @@ async function runAgent(
   // when MCP server is discovered, newToolsFound is set to True
   const newToolsFound = checkAndUpdateAgentContextIfMCPConnectionIsInitiated(
     steps,
-    agentContext
+    agentContext,
   );
 
   // If new tools are discovered, RE-RUN the agent
   if (newToolsFound) {
     const modelResponse = JSON.parse(
-      await runAgent(apiKey, input, agentContext, formattedSteps)
+      await runAgent(apiKey, input, agentContext, formattedSteps),
     );
     formattedSteps = modelResponse.steps;
   }
@@ -192,25 +257,40 @@ async function runAgent(
       agentContext,
     },
     null,
-    2
+    2,
   );
 }
 
-const getDecodedJWT = (toolResult: ToolResult) => {
-  const tokenRes: string = toolResult.result.content[0].text;
-  const token: string = tokenRes.split(" ")[tokenRes.split(" ").length - 1];
+const getDecodedJWT = (toolResult: ToolResult): DecodedJWTResult => {
+  const tokenRes: string = toolResult.result.content[0]?.text || "";
+
+  // Tokens in tool responses are human-readable strings like:
+  // "Account created. Access token is <JWT>".
+  // Don't rely on "last space-separated word" because the token may be followed by punctuation.
+  const token: string = extractAccessTokenFromToolText(tokenRes);
   if (isJWT(token)) {
-  const jwtHeader: string = jwtDecode(token, { header: true });
-  const jwtPayload: string = jwtDecode(token);
+    const jwtHeader: string = jwtDecode(token, { header: true });
+    const jwtPayload: string = jwtDecode(token);
 
-  const jwtDecoded = { header: jwtHeader, payload: jwtPayload };
-  return { token: token, jwtDecoded: jwtDecoded, isValidJWT: true };
-  } 
+    const jwtDecoded = { header: jwtHeader, payload: jwtPayload };
+    return { token: token, jwtDecoded: jwtDecoded, isValidJWT: true };
+  }
 
-  return { token: token, jwtDecoded: {},  isValidJWT: false };
+  // Fall back to returning something useful for debugging.
+  // If we couldn't find a JWT-shaped substring, include a small sample of the response.
+  return {
+    token,
+    jwtDecoded: {},
+    isValidJWT: false,
+    debug: { responseSample: tokenRes.slice(0, 200) },
+  };
 };
 
-const pushFormattedSteps = (formattedSteps: FormattedStep[], token: string, jwtDecoded: { header: string, payload: string}) => {
+const pushFormattedSteps = (
+  formattedSteps: FormattedStep[],
+  token: string,
+  jwtDecoded: { header: string; payload: string },
+) => {
   return formattedSteps.push({
     step: 1,
     text: "Decoding JWT token...",
@@ -234,7 +314,6 @@ const getStepDescription = (step: AIStep, toolCall: ToolCall | null) => {
   return text;
 };
 
-
 function makeTransport(url: string, headers: Record<string, string>) {
   return new StreamableHTTPClientTransport(new URL(url), {
     requestInit: { headers },
@@ -242,12 +321,11 @@ function makeTransport(url: string, headers: Record<string, string>) {
 }
 
 const prepareAllTools = async (agentContext: AgentContext) => {
-  // eslint-disable-next-line
-  const clients: Record<string, any> = {};
+  const clients: Record<string, unknown> = {};
 
   const allServers = [
-    ...agentContext?.available_mcp_servers,
-    ...agentContext?.dynamically_mounted_server,
+    ...(agentContext?.available_mcp_servers ?? []),
+    ...(agentContext?.dynamically_mounted_server ?? []),
   ];
   let allTools = { ...connectMcpServerTool };
 
@@ -259,11 +337,55 @@ const prepareAllTools = async (agentContext: AgentContext) => {
     try {
       // ---- TOOLS CLIENT ----
       const toolsTransport = makeTransport(server.url, server.headers);
-      const toolClient = await experimental_createMCPClient({ transport: toolsTransport });
+      const toolClient = await experimental_createMCPClient({
+        transport: toolsTransport,
+      });
       clients[localVar] = toolClient;
 
       const toolSet = await toolClient.tools();
-      allTools = { ...allTools, ...toolSet };
+      // Logging-only wrappers to prove whether the model is reusing a stale access token.
+      // These wrappers DO NOT modify args.
+      const wrappedToolSet: Record<string, unknown> = { ...toolSet };
+      const wrapTool = (toolName: string) => {
+        const orig = (wrappedToolSet as Record<string, unknown>)[toolName] as {
+          execute?: (args: unknown) => Promise<unknown>;
+        };
+
+        if (!orig?.execute) {
+          return;
+        }
+
+        const execute = orig.execute;
+
+        (wrappedToolSet as Record<string, unknown>)[toolName] = {
+          ...(orig as Record<string, unknown>),
+          execute: async (args: unknown) => {
+            const castedArgs = (args ?? {}) as Record<string, unknown>;
+            const accessToken =
+              typeof castedArgs.accessToken === "string"
+                ? (castedArgs.accessToken as string)
+                : "";
+            const extracted = accessToken
+              ? extractJwtFromText(accessToken)
+              : "";
+
+            const fp = extracted ? tokenFingerprint(extracted) : null;
+            console.warn(
+              `[buyer-token-proof] ${toolName} accessToken fingerprint:`,
+              fp,
+            );
+
+            return execute(args);
+          },
+        };
+      };
+
+      wrapTool("create-account-and-login");
+      wrapTool("search-dataset");
+      wrapTool("get-pricing");
+      wrapTool("download-dataset");
+
+      allTools = { ...allTools, ...wrappedToolSet };
 
       // ---- RESOURCES CLIENT ----
       const resourceTransport = makeTransport(server.url, server.headers);
@@ -283,7 +405,7 @@ const prepareAllTools = async (agentContext: AgentContext) => {
         const resource = await mcpClient.readResource({ uri: res.uri });
         console.log(
           `Resource loaded from ${server.url}:\n`,
-          resource.contents[0].text
+          resource.contents[0].text,
         );
 
         agentContext.conversation_history.push({
@@ -292,7 +414,10 @@ const prepareAllTools = async (agentContext: AgentContext) => {
         });
       }
     } catch (err) {
-      console.error(`Unexpected error accessing resources for ${server.url}:`, err);
+      console.error(
+        `Unexpected error accessing resources for ${server.url}:`,
+        err,
+      );
     }
   }
   return allTools;
@@ -300,41 +425,40 @@ const prepareAllTools = async (agentContext: AgentContext) => {
 
 const formatOutput = (steps: AIStep[], formattedSteps: FormattedStep[]) => {
   steps.forEach((step: AIStep) => {
-    if (step.toolCalls.length > 0)  {
+    if (step.toolCalls.length > 0) {
       for (let i = 0; i < step.toolCalls.length; i++) {
         const toolCall = step.toolCalls[i] as unknown as ToolCall;
         const toolResult = step.toolResults[i] as unknown as ToolResult;
         formattedSteps.push({
           step: 1,
           text: getStepDescription(step, toolCall),
-          tool:
-            toolCall && toolCall.toolName ? toolCall.toolName : "thinking",
+          tool: toolCall && toolCall.toolName ? toolCall.toolName : "thinking",
           input: toolCall ? toolCall.args : {},
           result: toolResult,
         });
 
-        if ( 
+        if (
           toolCall &&
           (toolCall.toolName === "create-payment-token" ||
             toolCall.toolName === "create-kya-token" ||
             toolCall.toolName === "create-pay-token" ||
-            toolCall.toolName === "create-account-and-login"
-            )
+            toolCall.toolName === "create-account-and-login")
         ) {
           try {
-          const { token, jwtDecoded, isValidJWT } = getDecodedJWT(toolResult);
-          if (isValidJWT) {
-          pushFormattedSteps(formattedSteps, token, JSON.parse(JSON.stringify(jwtDecoded)));
-          }
-          }
-          catch (err){
+            const { token, jwtDecoded, isValidJWT } = getDecodedJWT(toolResult);
+            if (isValidJWT) {
+              pushFormattedSteps(
+                formattedSteps,
+                token,
+                JSON.parse(JSON.stringify(jwtDecoded)),
+              );
+            }
+          } catch (err) {
             console.error("Error while decoding JWT token: ", err);
           }
         }
-
       }
-    }
-    else {
+    } else {
       formattedSteps.push({
         step: 1,
         text: getStepDescription(step, null),
@@ -342,13 +466,13 @@ const formatOutput = (steps: AIStep[], formattedSteps: FormattedStep[]) => {
         input: {},
         result: null,
       });
-    } 
+    }
   });
 };
 
 const checkAndUpdateAgentContextIfMCPConnectionIsInitiated = (
   steps: AIStep[],
-  agentContext: AgentContext
+  agentContext: AgentContext,
 ) => {
   let newToolsFound = false;
 
@@ -358,7 +482,7 @@ const checkAndUpdateAgentContextIfMCPConnectionIsInitiated = (
     if (toolCall && toolCall.toolName === "connect-mcp-server-tool") {
       const url = toolCall.args["mcpServerUrl"];
 
-       agentContext.dynamically_mounted_server = [{ url: url, headers: {} }];
+      agentContext.dynamically_mounted_server = [{ url: url, headers: {} }];
 
       agentContext.conversation_history.push({
         role: "system",

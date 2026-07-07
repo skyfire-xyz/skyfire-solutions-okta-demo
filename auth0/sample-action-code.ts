@@ -101,20 +101,20 @@ exports.onExecuteCustomTokenExchange = async (event, api) => {
     }
 
     // 5. Check if user already exists in Auth0 using Management API v2
-    const existingUser = await getUserByEmail(payload.bid.skyfireEmail);
+    const existingUser = await getUserByEmail(payload.hid.email);
 
     if (existingUser) {
         // User exists, use their existing user_id
         userId = existingUser.user_id;
-        console.log(`Found existing user with ID: ${userId} for email: ${payload.bid.skyfireEmail}`);
+        console.log(`Found existing user with ID: ${userId} for email: ${payload.hid.email}`);
         api.authentication.setUserById(existingUser.user_id);
         return;
     }
 
-    const name = `${payload.bid.nameFirst} ${payload.bid.nameLast}`;
+    const name = `${payload.hid.given_name} ${payload.hid.family_name}`;
     const patch = {
         user_id: payload.sub,
-        email: payload.bid.skyfireEmail,
+        email: payload.hid.email,
         username: payload.sub,
         email_verified: true,
         verify_email: false,
@@ -124,13 +124,13 @@ exports.onExecuteCustomTokenExchange = async (event, api) => {
         patch.name = name;
     }
 
-    if (payload.bid.nameFirst) {
-        patch.given_name = payload.bid.nameFirst;
-        patch.nickname  = payload.bid.nameFirst;
+    if (payload.hid.given_name) {
+        patch.given_name = payload.hid.given_name;
+        patch.nickname  = payload.hid.given_name;
     }
 
-    if (payload.bid.nameLast) {
-        patch.family_name = payload.bid.nameLast;
+    if (payload.hid.family_name) {
+        patch.family_name = payload.hid.family_name;
     }
 
 
@@ -247,8 +247,8 @@ exports.onExecuteCustomTokenExchange = async (event, api) => {
             // -- Additional Custom Validations --
 
             // 1. Validate 'typ' header: must be one of the expected types.
-            if (!['kya+JWT', 'kya+pay+JWT'].includes(protectedHeader.typ)) {
-                const message = 'typ should be one of kya+JWT or kya+pay+JWT.';
+            if (!['kya+jwt', 'kya-pay+jwt'].includes(protectedHeader.typ)) {
+                const message = 'typ should be one of kya+jwt or kya-pay+jwt.';
                 console.log(
                     `Validation failed: ${message} (got: ${protectedHeader.typ})`
                 );
@@ -258,13 +258,13 @@ exports.onExecuteCustomTokenExchange = async (event, api) => {
                 };
             }
 
-            // 2. Validate skyfireEmail format.
+            // 2. Validate email format.
             if (
-                !payload.bid ||
-                !validator.isEmail(String(payload.bid.skyfireEmail))
+                !payload.hid ||
+                !validator.isEmail(String(payload.hid.email))
             ) {
                 const message =
-                    "Invalid email format in 'bid.skyfireEmail' claim.";
+                    "Invalid email format in 'hid.email' claim.";
                 console.log(`Validation failed: ${message}`);
                 return {
                     isValid: false,

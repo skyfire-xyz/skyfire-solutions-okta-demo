@@ -2,9 +2,24 @@
 /* eslint-disable-next-line import/no-extraneous-dependencies */
 import { z } from 'zod' // NOTE: this MUST be the same version of zod as mcp server sdk's zod dependency, or there may be a typescript error
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import jwt, { JwtHeader, SigningKeyCallback } from "jsonwebtoken";
-import jwksClient from "jwks-rsa";
+import jwt, { JwtHeader, SigningKeyCallback } from 'jsonwebtoken'
+import jwksClient from 'jwks-rsa'
 import { config } from '../config'
+import logger from '../logger'
+import crypto from 'crypto'
+import {
+  extractJwkFromSigningKey,
+  extractJwt,
+  getKeyForIssuer as getKeyForIssuerImpl,
+  jwkFingerprintFromPem,
+  jwkFingerprintNThenE,
+  normalizeIssuer,
+  normalizeTokenLike,
+  publicKeyFingerprint,
+  tokenDebugFingerprint,
+  tokenSegmentFingerprints,
+  type SigningKeyFingerprints
+} from './utils'
 
 const skyfireSellerApiKey = config.get('skyfireSellerApiKey')
 const auth0Url = config.get('auth0Url')
@@ -16,58 +31,322 @@ const auth0ClientSecret = config.get('auth0ClientSecret')
 const datasetBaseUrl =
   'https://pub-303d212fa4df4073b8b38b3de4a72d89.r2.dev/Dappier'
 
+// Useful for signature/JWKS debugging without logging secrets.
+const jwksUri = `${auth0Url}/.well-known/jwks.json`
+
+// Default jwks-rsa client derived from configured AUTH0_URL.
 const client = jwksClient({
-  jwksUri: `${auth0Url}/.well-known/jwks.json`,
+  jwksUri,
   cache: true,
   rateLimit: true,
-  jwksRequestsPerMinute: 10,
-});
+  jwksRequestsPerMinute: 10
+})
+
+// Last key fingerprints seen during verification. This is used for logging-only correlation
+// in jwt.verify failure logs (so we can compare failing tokens to the key material used).
+let lastSigningKeyFingerprints: SigningKeyFingerprints | null = null
+
+const getKeyForIssuerWithTracking = (
+  issuer: string,
+  header: JwtHeader,
+  callback: SigningKeyCallback
+) =>
+  getKeyForIssuerImpl({
+    issuer,
+    header,
+    callback,
+    setLastSigningKeyFingerprints: (fp: SigningKeyFingerprints | null) => {
+      lastSigningKeyFingerprints = fp
+    }
+  })
 
 function getKey(header: JwtHeader, callback: SigningKeyCallback) {
-  client.getSigningKey(header.kid as string, (err, key) => {
+  // Uses the configured jwksUri from AUTH0_URL. For issuer-derived verification,
+  // use getKeyForIssuer.
+  const kidRaw = header?.kid
+  const kid = typeof kidRaw === 'string' ? kidRaw.trim() : ''
+
+  if (!kid) {
+    const err = new Error(
+      'JWT header missing or invalid "kid" (expected non-empty string)'
+    )
+    logger.warn(
+      {
+        jwks: { uri: jwksUri },
+        tokenHeader: {
+          kid: kidRaw,
+          alg: header?.alg,
+          typ: header?.typ
+        },
+        err: { name: err.name, message: err.message }
+      },
+      'Auth0 JWKS: cannot retrieve signing key because token header kid is missing/invalid'
+    )
+    callback(err)
+    return
+  }
+
+  logger.debug(
+    {
+      jwks: {
+        uri: jwksUri,
+        cache: true,
+        rateLimit: true
+      },
+      tokenHeader: {
+        kid,
+        alg: header.alg,
+        typ: header.typ
+      }
+    },
+    'Auth0 JWKS: retrieving signing key'
+  )
+
+  client.getSigningKey(kid, (err, key) => {
     if (err) {
-      callback(err);
-      return;
+      logger.warn(
+        {
+          jwks: { uri: jwksUri },
+          tokenHeader: { kid, alg: header.alg, typ: header.typ },
+          err: { name: err.name, message: err.message }
+        },
+        'Auth0 JWKS: failed to retrieve signing key'
+      )
+      callback(err)
+      return
     }
-    const signingKey = key?.getPublicKey();
-    callback(null, signingKey);
-  });
+    const signingKey = key?.getPublicKey()
+    const maybeJwk = extractJwkFromSigningKey(key as unknown)
+    const jwkNeSha =
+      (maybeJwk ? jwkFingerprintNThenE(maybeJwk) : null) ??
+      (signingKey ? jwkFingerprintFromPem(signingKey) : null)
+
+    if (signingKey) {
+      lastSigningKeyFingerprints = {
+        pem_sha256_12: publicKeyFingerprint(signingKey),
+        jwk_ne_sha256_12: jwkNeSha
+      }
+
+      logger.debug(
+        {
+          jwks: { uri: jwksUri },
+          tokenHeader: { kid, alg: header.alg, typ: header.typ },
+          signingKey: {
+            pem_sha256_12: lastSigningKeyFingerprints.pem_sha256_12,
+            jwk_ne_sha256_12: lastSigningKeyFingerprints.jwk_ne_sha256_12
+          }
+        },
+        'Auth0 JWKS: retrieved signing key'
+      )
+    }
+
+    callback(null, signingKey)
+  })
 }
 
 async function validateAuth0Token(
-  accessToken: string
+  accessToken: string,
+  opts?: { mcpSessionId?: string }
 ): Promise<{ valid: true; payload: any } | { valid: false; reason: string }> {
   return new Promise((resolve) => {
-    jwt.verify(
-      accessToken,
-      getKey,
+    const mcpSessionId = opts?.mcpSessionId
+
+    const normalizedAccessToken = normalizeTokenLike(accessToken)
+
+    logger.debug(
       {
-        algorithms: ["RS256"],
-        issuer: `${auth0Url}/`,
-        audience: auth0Audience,
+        mcpSessionId,
+        auth0: {
+          configuredIssuer: `${auth0Url}/`,
+          configuredAudience: auth0Audience,
+          configuredJwksUri: jwksUri
+        }
+      },
+      'Auth0 token validation: verify configuration (configured)'
+    )
+
+    const extracted = extractJwt(normalizedAccessToken)
+    if (!extracted) {
+      logger.debug(
+        {
+          mcpSessionId,
+          accessTokenDebug: tokenDebugFingerprint(accessToken),
+          normalizedAccessTokenDebug: tokenDebugFingerprint(
+            normalizedAccessToken
+          )
+        },
+        'Auth0 token validation failed: no JWT found in accessToken'
+      )
+      resolve({
+        valid: false,
+        reason: 'JWT error: accessToken did not contain a JWT'
+      })
+      return
+    }
+
+    if (extracted !== normalizedAccessToken) {
+      logger.debug(
+        {
+          mcpSessionId,
+          accessTokenDebug: tokenDebugFingerprint(accessToken),
+          normalizedAccessTokenDebug: tokenDebugFingerprint(
+            normalizedAccessToken
+          ),
+          extractedDebug: tokenDebugFingerprint(extracted)
+        },
+        'Auth0 token validation: sanitized accessToken (extracted JWT substring)'
+      )
+    } else {
+      logger.debug(
+        {
+          mcpSessionId,
+          accessTokenDebug: tokenDebugFingerprint(accessToken),
+          normalizedAccessTokenDebug: tokenDebugFingerprint(
+            normalizedAccessToken
+          )
+        },
+        'Auth0 token validation: accessToken appears to be a JWT'
+      )
+    }
+
+    // Decode metadata for debugging invalid signature / issuer / audience mismatches.
+    // This does NOT verify the token and intentionally avoids logging the full token.
+    const decoded = jwt.decode(extracted, { complete: true }) as {
+      header?: JwtHeader
+      payload?: any
+    } | null
+    const tokenMeta = {
+      kid: decoded?.header?.kid,
+      alg: decoded?.header?.alg,
+      iss: decoded?.payload?.iss,
+      aud: decoded?.payload?.aud
+    }
+
+    const issuerFromToken = normalizeIssuer(tokenMeta.iss)
+    const issuerToUse = issuerFromToken ?? `${auth0Url}/`
+    const jwksUriToUse = issuerFromToken
+      ? `${issuerToUse}.well-known/jwks.json`
+      : jwksUri
+
+    logger.info(
+      {
+        mcpSessionId,
+        auth0: {
+          issuerToUse,
+          jwksUriToUse,
+          audience: auth0Audience,
+          issuerSource: issuerFromToken ? 'token' : 'configured'
+        }
+      },
+      'Auth0 token validation: effective verify configuration'
+    )
+
+    logger.debug(
+      {
+        mcpSessionId,
+        tokenMeta,
+        accessTokenDebug: tokenDebugFingerprint(accessToken),
+        accessTokenSegDebug: tokenSegmentFingerprints(extracted),
+        extractedDebug: tokenDebugFingerprint(extracted),
+        auth0: {
+          issuer: issuerToUse,
+          audience: auth0Audience,
+          jwksUri: jwksUriToUse
+        }
+      },
+      'Auth0 token validation: decoded token metadata'
+    )
+
+    jwt.verify(
+      extracted,
+      (header: JwtHeader, callback: SigningKeyCallback) => {
+        if (issuerFromToken) {
+          return getKeyForIssuerWithTracking(issuerToUse, header, callback)
+        }
+        return getKey(header, callback)
+      },
+      {
+        algorithms: ['RS256'],
+        issuer: issuerToUse,
+        audience: auth0Audience
       },
       (err, decoded) => {
         if (err) {
-          let reason = err.message || "Invalid or unverifiable token";
-          if (err.name === "TokenExpiredError") reason = "Token expired";
-          if (err.name === "JsonWebTokenError")
-            reason = `JWT error: ${err.message}`;
-          if (err.name === "NotBeforeError") reason = "Token not active yet";
+          logger.warn(
+            {
+              mcpSessionId,
+              err: { name: err.name, message: err.message },
+              tokenMeta,
+              signingKey: lastSigningKeyFingerprints,
+              auth0: {
+                issuer: issuerToUse,
+                audience: auth0Audience,
+                jwksUri: jwksUriToUse
+              }
+            },
+            'Auth0 token validation: jwt.verify failed'
+          )
 
-          resolve({ valid: false, reason });
-          return;
+          let reason = err.message || 'Invalid or unverifiable token'
+          if (err.name === 'TokenExpiredError') {
+            reason = 'Token expired'
+          }
+
+          if (err.name === 'JsonWebTokenError') {
+            reason = `JWT error: ${err.message}`
+          }
+
+          if (err.name === 'NotBeforeError') {
+            reason = 'Token not active yet'
+          }
+
+          reason = `${reason} (tokenMeta=${JSON.stringify(tokenMeta)})`
+
+          resolve({ valid: false, reason })
+          return
         }
-        resolve({ valid: true, payload: decoded });
+
+        resolve({ valid: true, payload: decoded })
       }
-    );
-  });
+    )
+  })
+}
+
+// Auth0 can return an error JSON payload. Handle that explicitly so we never
+// "succeed" with an empty token.
+type Auth0TokenSuccess = {
+  access_token: string
+  expires_in: number
+  token_type: string
+  issued_token_type: string
+}
+type Auth0TokenError = {
+  error?: string
+  error_description?: string
 }
 
 const createAccountAndLoginWithAuth0 = async (
   kyaToken: string,
-  resToken: string
+  _password: string,
+  opts?: { mcpSessionId?: string }
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 ) => {
+  const mcpSessionId = opts?.mcpSessionId
+  logger.debug(
+    {
+      mcpSessionId,
+      auth0: {
+        tokenEndpoint: `${auth0Url}/oauth/token`,
+        audience: auth0Audience,
+        clientIdSuffix:
+          typeof auth0ClientId === 'string' && auth0ClientId.length >= 6
+            ? auth0ClientId.slice(-6)
+            : 'unknown'
+      }
+    },
+    'Auth0 token mint: requesting access token'
+  )
+
   const auth = await fetch(`${auth0Url}/oauth/token`, {
     method: 'POST',
     headers: {
@@ -83,19 +362,139 @@ const createAccountAndLoginWithAuth0 = async (
     })
   })
 
-  const authRes = (await auth.json()) as {
-    access_token: string
-    expires_in: number
-    token_type: string
-    issued_token_type: string
+  const authJson = (await auth.json()) as Auth0TokenSuccess | Auth0TokenError
+
+  if (!auth.ok) {
+    const errCode =
+      typeof (authJson as Auth0TokenError)?.error === 'string'
+        ? (authJson as Auth0TokenError).error
+        : 'auth0_error'
+    const errDesc =
+      typeof (authJson as Auth0TokenError)?.error_description === 'string'
+        ? (authJson as Auth0TokenError).error_description
+        : undefined
+
+    logger.warn(
+      {
+        mcpSessionId,
+        auth0: {
+          tokenEndpoint: `${auth0Url}/oauth/token`,
+          audience: auth0Audience
+        },
+        status: auth.status,
+        err: {
+          code: errCode,
+          description: errDesc
+        }
+      },
+      'Auth0 token mint: request failed'
+    )
+
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `Unauthorized: Auth0 token mint failed (status=${auth.status}, error=${errCode})`
+        }
+      ]
+    }
   }
 
-  resToken = authRes.access_token
+  const authRes = authJson as Auth0TokenSuccess
+
+  // Build the exact token string we will return to the buyer.
+  // IMPORTANT: do not re-extract the token from a prose string, and do not reuse any caller-provided token value.
+  const mintedAccessToken = authRes?.access_token ?? ''
+
+  // Logging-only: fingerprint and decode the minted token to ensure it aligns with the
+  // expected issuer/audience/kid, without logging the raw token.
+  try {
+    const extracted = extractJwt(mintedAccessToken) ?? ''
+    const decodedMint = jwt.decode(extracted, { complete: true }) as {
+      header?: JwtHeader
+      payload?: any
+    } | null
+    const mintedFp = tokenDebugFingerprint(extracted || mintedAccessToken)
+    logger.debug(
+      {
+        mcpSessionId,
+        minted: {
+          accessTokenDebug: mintedFp,
+          accessTokenSegDebug: tokenSegmentFingerprints(
+            extracted || mintedAccessToken
+          ),
+          tokenMeta: {
+            kid: decodedMint?.header?.kid,
+            alg: decodedMint?.header?.alg,
+            iss: decodedMint?.payload?.iss,
+            aud: decodedMint?.payload?.aud
+          }
+        },
+        auth0: {
+          tokenEndpoint: `${auth0Url}/oauth/token`,
+          issuer: `${auth0Url}/`,
+          audience: auth0Audience
+        }
+      },
+      'Auth0 token mint: received access token (fingerprint only)'
+    )
+
+    // Correlate what we minted with what we actually return to the buyer agent.
+    // (In practice these should be identical, but this catches subtle string/flow issues.)
+    const returnedFp = tokenDebugFingerprint(mintedAccessToken)
+    logger.debug(
+      {
+        mcpSessionId,
+        returnedToBuyerIsJwtLike: Boolean(extractJwt(mintedAccessToken)),
+        returnedToBuyer: {
+          accessTokenDebug: returnedFp,
+          accessTokenSegDebug: tokenSegmentFingerprints(mintedAccessToken)
+        }
+      },
+      'Auth0 token mint: returning access token to buyer (fingerprint only)'
+    )
+
+    if (mintedFp.sha256_12 !== returnedFp.sha256_12) {
+      logger.warn(
+        {
+          mcpSessionId,
+          minted: mintedFp,
+          returnedToBuyer: returnedFp
+        },
+        'Auth0 token mint: minted token differs from returned token (fingerprint mismatch)'
+      )
+    }
+  } catch (e) {
+    logger.warn(
+      {
+        mcpSessionId,
+        err: {
+          name: e instanceof Error ? e.name : 'UnknownError',
+          message: e instanceof Error ? e.message : String(e)
+        }
+      },
+      'Auth0 token mint: failed to decode minted access token for debugging'
+    )
+  }
+
+  // Return a structured JSON payload so the buyer can reliably consume the token
+  // without brittle regex extraction from prose.
   return {
     content: [
       {
         type: 'text' as const,
-        text: `Account created. Access token is ${resToken}`
+        // Include a plain accessToken line first to reduce any chance of JSON-string escaping
+        // issues in intermediate logs/agents; buyer can still prefer JSON parsing.
+        text: `accessToken=${mintedAccessToken}\n${JSON.stringify(
+          {
+            message: 'Account created',
+            accessToken: mintedAccessToken,
+            tokenType: authRes?.token_type,
+            expiresIn: authRes?.expires_in
+          },
+          null,
+          2
+        )}`
       }
     ]
   }
@@ -110,27 +509,33 @@ export class DappierMCP {
       tools: {}
     }
   })
-  
+
   withAuth(handler: (args: any, extra?: any) => Promise<any>) {
-      return async (args: any, extra?: any) => {
-        const { accessToken } = args;
+    return async (args: any, extra?: any) => {
+      const { accessToken } = args
 
-        const validation = await validateAuth0Token(accessToken);
+      const mcpSessionIdRaw =
+        (extra?.req?.headers?.['mcp-session-id'] as string | undefined) ??
+        (extra?.req?.headers?.['MCP-Session-Id'] as string | undefined)
+      const mcpSessionId =
+        typeof mcpSessionIdRaw === 'string' ? mcpSessionIdRaw : undefined
 
-        if (!validation.valid) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: `Unauthorized: ${validation.reason}`,
-              },
-            ],
-          };
+      const validation = await validateAuth0Token(accessToken, { mcpSessionId })
+
+      if (!validation.valid) {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: `Unauthorized: ${validation.reason}`
+            }
+          ]
         }
+      }
 
-        return await handler(args, extra);
-      };
+      return await handler(args, extra)
     }
+  }
 
   // Initialize mock data
   dataset = {
@@ -172,7 +577,6 @@ export class DappierMCP {
   }
 
   init(): void {
-
     this.server.resource('guide', 'mcp://guide', async (uri) => {
       return {
         contents: [
@@ -193,12 +597,12 @@ export class DappierMCP {
         ]
       }
     })
-    
+
     this.server.tool(
       'create-account-and-login',
       `Having an account with Dappier is mandatory to access its tools. This tool creates account for current buyer agent 
       using the KYA token generated by Skyfire and an agent generated new secure regex password that must contain minimum of 8, 
-      maximum of 12 alphanumeric characters including atleast 1 uppercase character, 1 numeric character and 1 special character.
+      maximum of 12 alphanumeric characters including at least 1 uppercase character, 1 numeric character and 1 special character.
       On successful account creation, access token is returned`,
       {
         kyaToken: z.string().describe(
@@ -207,11 +611,15 @@ export class DappierMCP {
         ),
         password: z.string().describe(
           `Secure random new regex password generated by agent that contains minimum 8, 
-          maximum 12 alphanumeric characters including atleast 
+          maximum 12 alphanumeric characters including at least 
           1 uppercase character, 1 numeric character and 1 special character`
         )
       },
       async ({ kyaToken, password }) => {
+        // The MCP SDK provides request context as the `extra` argument on tool calls.
+        // We capture the server-side MCP session id for log correlation.
+        // NOTE: extra isn't available here because this tool handler signature only provides args.
+        // Correlation for this tool is handled in the upstream transport logs.
         return createAccountAndLoginWithAuth0(kyaToken, password)
       }
     )
@@ -243,8 +651,7 @@ export class DappierMCP {
             '\n'
         }
 
-        response =
-          response + '\nYour accessToken - ' + accessToken + ' is verified'
+        response = response + '\nAccess token verified.'
 
         return {
           content: [
@@ -254,8 +661,8 @@ export class DappierMCP {
             }
           ]
         }
-      }
-    ))
+      })
+    )
 
     this.server.tool(
       'get-pricing',
@@ -276,12 +683,12 @@ export class DappierMCP {
           content: [
             {
               type: 'text' as const,
-              text: `Pricing for selected dataset ${datasetId} is ${res[0].price}. Your accessToken - ${accessToken} is verified`
+              text: `Pricing for selected dataset ${datasetId} is ${res[0].price}. Access token verified.`
             }
           ]
         }
-      }
-    ))
+      })
+    )
 
     this.server.tool(
       'download-dataset',
@@ -293,12 +700,10 @@ export class DappierMCP {
           .string()
           .describe('Access token required to access and execute this tool'),
         datasetId: z.number().describe('ID for chosen dataset'),
-        payToken: z
-          .string()
-          .describe(
-            `PAY token (JWT) generated by Skyfire 
+        payToken: z.string().describe(
+          `PAY token (JWT) generated by Skyfire 
             for verifying and claiming payment`
-          )
+        )
       },
 
       this.withAuth(async ({ accessToken, datasetId, payToken }) => {
@@ -333,7 +738,7 @@ export class DappierMCP {
             content: [
               {
                 type: 'text' as const,
-                text: `Purchased dataset ${datasetId}. Download from ${currentDataset[0].dataUrl}. Your accessToken - ${accessToken} is verified`
+                text: `Purchased dataset ${datasetId}. Download from ${currentDataset[0].dataUrl}. Access token verified.`
               }
             ]
           }
@@ -347,7 +752,7 @@ export class DappierMCP {
             }
           ]
         }
-      }
-    ))
+      })
+    )
   }
 }

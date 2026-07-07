@@ -16,8 +16,8 @@
   "scripts": {
     "start": "NODE_PATH=./build node --enable-source-maps build/server.js",
     "build": "tsc",
-    "format": "prettier --write \"src/**/*.{ts,tsx,js}\"",
-    "format-check": "prettier --check \"src/**/*.{ts,js}\"",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "lint": "yarn eslint src --ext ts --max-warnings 0",
     "dev": "NODE_PATH=./ nodemon --watch src -e ts -x 'ts-node src/server.ts'"
   },
@@ -45,13 +45,13 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "@skyfire-xyz/eslint-config-node": "^3.2.1",
-    "@types/convict": "^6.1.6",
-    "eslint": "^8.50.0",
-    "nodemon": "^3.1.10",
-    "pino-pretty": "^13.0.0",
-    "prettier": "^3.5.3",
-    "ts-node": "^10.9.2",
-    "tsconfig-paths": "^4.2.0"
+    "@skyfire-xyz/eslint-config-node": "3.2.1",
+    "@types/convict": "6.1.6",
+    "eslint": "8.50.0",
+    "nodemon": "3.1.10",
+    "pino-pretty": "13.0.0",
+    "prettier": "3.5.3",
+    "ts-node": "10.9.2",
+    "tsconfig-paths": "4.2.0"
   }
 }

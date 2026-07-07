@@ -38,7 +38,7 @@ export function formatMarkdownContent(content: unknown): string {
 }
 
 export const getDisplayTextFromHistory = (
-  parsedItem: Record<string, string>
+  parsedItem: Record<string, string>,
 ): string => {
   const values = Object.values(parsedItem);
   for (const value of values) {
@@ -53,9 +53,8 @@ export const formatDisplayText = (text: string): string => {
   return text.length > 50 ? `${text.slice(0, 50)}...` : text;
 };
 
-
-export const isJWT = (token:string): boolean => {
-  const parts = token.split('.');
+export const isJWT = (token: string): boolean => {
+  const parts = token.split(".");
   if (parts.length !== 3) {
     return false;
   }
@@ -72,4 +71,4 @@ export const isJWT = (token:string): boolean => {
   }
 
   return true;
-}
+};

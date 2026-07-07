@@ -3,6 +3,7 @@
 This application is designed to demonstrate end-to-end commerce flows using Skyfire technologies. It features a prompt-based AI agent interface that interacts with services via the Model Context Protocol (MCP) to simulate tool discovery, tool installation, and using the tools leveraging the Vercel AI SDK.
 
 The agent is tasked with -
+
 ```
 Purchase a dataset for pickup truck sales
 - Time period: 2024
@@ -10,9 +11,10 @@ Purchase a dataset for pickup truck sales
 - Data points: Sales volumes, pricing trends etc
 - Format: CSV or Excel
 - Budget: $0.005
-``` 
+```
 
 ## Live Demo Link
+
 This demo agent is available [here](https://data-analyst-agent-okta-demo.skyfire.xyz/).
 
 ## Installation
@@ -21,10 +23,10 @@ This demo agent is available [here](https://data-analyst-agent-okta-demo.skyfire
     ```bash
     yarn install
     ```
-2. Setup OpenAI account and get API key for LLM
-3. Setup Skyfire account using [Skyfire Platform Setup Guide](https://docs.skyfire.xyz/docs/introduction) and get the buyer agent API key
-4. Run the MCP servers locally to get their URLs
-5. Set up environment variables:
+2.  Setup OpenAI account and get API key for LLM
+3.  Setup Skyfire account using [Skyfire Platform Setup Guide](https://docs.skyfire.xyz/docs/introduction) and get the buyer agent API key
+4.  Run the MCP servers locally to get their URLs
+5.  Set up environment variables:
     Create a `.env` file in the root directory. You can copy `.env.example` if one exists, or add the necessary variables manually.
 
     ```
