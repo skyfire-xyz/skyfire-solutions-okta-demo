@@ -1,13 +1,14 @@
 "use server";
 
 import { openai } from "@ai-sdk/openai";
-import { wrapAISDKModel } from "langsmith/wrappers/vercel";
 import {
   generateText,
-  experimental_createMCPClient,
   jsonSchema,
+  stepCountIs,
   type StepResult,
+  type ToolSet,
 } from "ai";
+import { experimental_createMCPClient } from "@ai-sdk/mcp";
 import { AgentContext } from "@/lib/types";
 import { jwtDecode } from "jwt-decode";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -15,8 +16,10 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { isJWT } from "@/lib/utils";
 import crypto from "crypto";
 
-const vercelModel = openai("gpt-5.4", { structuredOutputs: true });
-const modelWithTracing = wrapAISDKModel(vercelModel);
+// LangSmith's model-wrapper API (wrapAISDKModel) was removed in langsmith >=0.8
+// in favor of wrapAISDK/telemetry, and no LangSmith credentials are configured,
+// so the model is used directly. Re-introduce tracing via the new API if needed.
+const modelWithTracing = openai("gpt-5.4");
 
 interface FormattedStep {
   step: number;
@@ -30,7 +33,7 @@ interface ToolCall {
   type: string;
   toolCallId: string;
   toolName: string;
-  args: {
+  input: {
     [key: string]: string;
   };
 }
@@ -93,7 +96,7 @@ function tokenFingerprint(tokenLike: string): {
 }
 
 // Use the SDK's types directly
-type AIStep = StepResult<typeof connectMcpServerTool>;
+type AIStep = StepResult<ToolSet>;
 
 const textConfig: { [key: string]: string } = {
   "find-sellers":
@@ -121,7 +124,7 @@ const connectMcpServerTool = {
   "connect-mcp-server-tool": {
     description:
       "Connects to the seller MCP server URL. After calling this tool, stop agent execution immediately after.",
-    parameters: jsonSchema({
+    inputSchema: jsonSchema({
       type: "object",
       properties: {
         mcpServerUrl: {
@@ -208,6 +211,18 @@ async function runAgent(
     content: input,
   });
 
+  // AI SDK v5+ no longer accepts `system`-role entries inside `messages`; they
+  // must be supplied via the top-level `system` option. The agent accumulates
+  // system entries (base instructions, MCP resource docs, "now connected"
+  // notices) in conversation_history, so split them out at this boundary.
+  const systemPrompt = agentContext.conversation_history
+    .filter((m) => m.role === "system")
+    .map((m) => (typeof m.content === "string" ? m.content : ""))
+    .join("\n\n");
+  const nonSystemMessages = agentContext.conversation_history.filter(
+    (m) => m.role !== "system",
+  );
+
   // Run agent by passing all the prepared tools and agentContext
   const {
     text: answer,
@@ -216,14 +231,11 @@ async function runAgent(
     response,
   } = await generateText({
     model: modelWithTracing,
-    providerOptions: {
-      openai: {
-        maxCompletionTokens: 5000,
-      },
-    },
+    system: systemPrompt,
+    maxOutputTokens: 8000,
     tools: allTools,
-    maxSteps: 20,
-    messages: agentContext.conversation_history,
+    stopWhen: stepCountIs(20),
+    messages: nonSystemMessages,
   });
 
   // Update agentContext to include all the executed steps
@@ -249,11 +261,17 @@ async function runAgent(
   }
 
   // Return final response
+  // AI SDK v5+ renamed usage fields (inputTokens/outputTokens); the UI still
+  // reads the legacy promptTokens/completionTokens shape, so map back here.
   return JSON.stringify(
     {
       answer,
       steps: formattedSteps,
-      usage,
+      usage: {
+        promptTokens: usage.inputTokens ?? 0,
+        completionTokens: usage.outputTokens ?? 0,
+        totalTokens: usage.totalTokens ?? 0,
+      },
       agentContext,
     },
     null,
@@ -308,7 +326,7 @@ const getStepDescription = (step: AIStep, toolCall: ToolCall | null) => {
   if (toolCall) {
     text = textConfig[toolCall.toolName] || text;
     if (toolCall.toolName === "get-pricing") {
-      text = text + " " + toolCall.args["datasetId"];
+      text = text + " " + toolCall.input["datasetId"];
     }
   }
   return text;
@@ -327,7 +345,7 @@ const prepareAllTools = async (agentContext: AgentContext) => {
     ...(agentContext?.available_mcp_servers ?? []),
     ...(agentContext?.dynamically_mounted_server ?? []),
   ];
-  let allTools = { ...connectMcpServerTool };
+  let allTools: ToolSet = { ...connectMcpServerTool } as ToolSet;
 
   //process mcp servers (tools + resources)
   for (let i = 0; i < allServers?.length; i++) {
@@ -348,7 +366,7 @@ const prepareAllTools = async (agentContext: AgentContext) => {
       const wrappedToolSet: Record<string, unknown> = { ...toolSet };
       const wrapTool = (toolName: string) => {
         const orig = (wrappedToolSet as Record<string, unknown>)[toolName] as {
-          execute?: (args: unknown) => Promise<unknown>;
+          execute?: (...args: unknown[]) => Promise<unknown>;
         };
 
         if (!orig?.execute) {
@@ -359,8 +377,10 @@ const prepareAllTools = async (agentContext: AgentContext) => {
 
         (wrappedToolSet as Record<string, unknown>)[toolName] = {
           ...(orig as Record<string, unknown>),
-          execute: async (args: unknown) => {
-            const castedArgs = (args ?? {}) as Record<string, unknown>;
+          // AI SDK v5+ calls execute(input, options); forward every argument
+          // through so the underlying MCP tool keeps its abort signal / metadata.
+          execute: async (...allArgs: unknown[]) => {
+            const castedArgs = (allArgs[0] ?? {}) as Record<string, unknown>;
             const accessToken =
               typeof castedArgs.accessToken === "string"
                 ? (castedArgs.accessToken as string)
@@ -375,7 +395,7 @@ const prepareAllTools = async (agentContext: AgentContext) => {
               fp,
             );
 
-            return execute(args);
+            return execute(...allArgs);
           },
         };
       };
@@ -385,7 +405,7 @@ const prepareAllTools = async (agentContext: AgentContext) => {
       wrapTool("get-pricing");
       wrapTool("download-dataset");
 
-      allTools = { ...allTools, ...wrappedToolSet };
+      allTools = { ...allTools, ...wrappedToolSet } as ToolSet;
 
       // ---- RESOURCES CLIENT ----
       const resourceTransport = makeTransport(server.url, server.headers);
@@ -414,9 +434,22 @@ const prepareAllTools = async (agentContext: AgentContext) => {
         });
       }
     } catch (err) {
+      const errObj = err as Record<string, unknown>;
+      const details: Record<string, unknown> = {
+        message: errObj?.message ?? String(err),
+        stack: errObj?.stack,
+        code: errObj?.code,
+        statusCode: errObj?.statusCode ?? errObj?.status,
+        responseBody: errObj?.responseBody ?? errObj?.body,
+        cause: errObj?.cause,
+      };
+      // Strip undefined fields for cleaner output
+      Object.keys(details).forEach(
+        (k) => details[k] === undefined && delete details[k],
+      );
       console.error(
         `Unexpected error accessing resources for ${server.url}:`,
-        err,
+        details,
       );
     }
   }
@@ -428,17 +461,26 @@ const formatOutput = (steps: AIStep[], formattedSteps: FormattedStep[]) => {
     if (step.toolCalls.length > 0) {
       for (let i = 0; i < step.toolCalls.length; i++) {
         const toolCall = step.toolCalls[i] as unknown as ToolCall;
-        const toolResult = step.toolResults[i] as unknown as ToolResult;
+        // AI SDK v5+ exposes the tool result payload on `.output` (was `.result`).
+        // Normalize to the legacy `{ result: { content } }` shape the UI and the
+        // JWT decoder downstream still expect.
+        const rawToolResult = step.toolResults[i] as unknown as {
+          output?: { content: Array<{ type: string; text: string }> };
+        };
+        const toolResult: ToolResult | null = rawToolResult?.output
+          ? { result: rawToolResult.output }
+          : null;
         formattedSteps.push({
           step: 1,
           text: getStepDescription(step, toolCall),
           tool: toolCall && toolCall.toolName ? toolCall.toolName : "thinking",
-          input: toolCall ? toolCall.args : {},
+          input: toolCall ? toolCall.input : {},
           result: toolResult,
         });
 
         if (
           toolCall &&
+          toolResult &&
           (toolCall.toolName === "create-payment-token" ||
             toolCall.toolName === "create-kya-token" ||
             toolCall.toolName === "create-pay-token" ||
@@ -480,7 +522,7 @@ const checkAndUpdateAgentContextIfMCPConnectionIsInitiated = (
     const toolCall = step.toolCalls?.[0] as unknown as ToolCall;
 
     if (toolCall && toolCall.toolName === "connect-mcp-server-tool") {
-      const url = toolCall.args["mcpServerUrl"];
+      const url = toolCall.input["mcpServerUrl"];
 
       agentContext.dynamically_mounted_server = [{ url: url, headers: {} }];
 
