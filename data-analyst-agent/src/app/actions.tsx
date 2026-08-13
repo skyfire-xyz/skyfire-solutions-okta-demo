@@ -423,14 +423,14 @@ const prepareAllTools = async (agentContext: AgentContext) => {
 
       for (const res of resources.resources) {
         const resource = await mcpClient.readResource({ uri: res.uri });
-        console.log(
-          `Resource loaded from ${server.url}:\n`,
-          resource.contents[0].text,
-        );
+        // contents entries are either text or blob variants; we only use text
+        const [contents] = resource.contents;
+        const text = contents && "text" in contents ? contents.text : undefined;
+        console.log(`Resource loaded from ${server.url}:\n`, text);
 
         agentContext.conversation_history.push({
           role: "system",
-          content: `${resource.contents[0].text}`,
+          content: `${text}`,
         });
       }
     } catch (err) {
