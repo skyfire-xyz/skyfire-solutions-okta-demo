@@ -405,14 +405,14 @@
     eslint-plugin-promise "^6.1.1"
     prettier-config-standard "^7.0.0"
 
-"@skyfire-xyz/prettier-config-node@^3.0.0":
+"@skyfire-xyz/prettier-config-node@3.0.0":
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/@skyfire-xyz/prettier-config-node/-/prettier-config-node-3.0.0.tgz#df97e0d8cafe6e15d5114edc0b1b3d2486b5ae35"
   integrity sha512-1WWaqYRUFb3SE2hWrsmbo4tn5MoSNOIh3QNpdpVwajATpKVTg+DuBE2lzWx+jYNuMR5CkBJZjQdbAJUj/2ywMA==
   dependencies:
     prettier-config-standard "^7.0.0"
 
-"@skyfire-xyz/tsconfig@^2.0.0":
+"@skyfire-xyz/tsconfig@2.0.0":
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/@skyfire-xyz/tsconfig/-/tsconfig-2.0.0.tgz#6750a1e38c37dd849014586a579a1693496265cd"
   integrity sha512-wcmv62YrbCP7+wfpexPYjwl+/USeL3FYLp+F526IlFxFhaj/s5zX0e09CyNNl/hIzQVc/iAUBTNS/3O7RNrrSQ==
@@ -504,7 +504,7 @@
     "@types/range-parser" "*"
     "@types/send" "*"
 
-"@types/express@^5.0.3":
+"@types/express@5.0.6":
   version "5.0.6"
   resolved "https://registry.yarnpkg.com/@types/express/-/express-5.0.6.tgz#2d724b2c990dcb8c8444063f3580a903f6d500cc"
   integrity sha512-sKYVuV7Sv9fbPIt/442koC7+IIwK5olP1KWeD88e/idgoJqDm3JV/YUiPwkoKK92ylff2MGxSz1CSjsXelx0YA==
@@ -535,7 +535,7 @@
   dependencies:
     undici-types "~7.12.0"
 
-"@types/node@^24.0.3":
+"@types/node@24.13.3":
   version "24.13.3"
   resolved "https://registry.yarnpkg.com/@types/node/-/node-24.13.3.tgz#49f18bd3c647866dcda51a0756c145e14590ce16"
   integrity sha512-Dh8vAsV36ig5wa9OX4pXvMc9D3Veibfw2wix0CUwYODLD8nkj9UsLjASr49nPg+2eKzxhBV+v7L8pXvT4e639Q==
@@ -955,7 +955,7 @@ available-typed-arrays@^1.0.7:
   dependencies:
     possible-typed-array-names "^1.0.0"
 
-axios@^1.18.0:
+"axios@1.19.0":
   version "1.19.0"
   resolved "https://registry.yarnpkg.com/axios/-/axios-1.19.0.tgz#ddf864d4c8233c0e6873746ab59361537d05ad39"
   integrity sha512-ht/iuYZXEjFxLH/Hkezgd7m6JKlHHXEUSneaDz8uZe1Gj5QZtCnpyDsckvAiEnT89OEbCLmnte4R4sn7P0EKFw==
@@ -1165,7 +1165,7 @@ content-type@^2.0.0:
   resolved "https://registry.yarnpkg.com/content-type/-/content-type-2.0.0.tgz#2fb3ede69dffa0af78ca7c4ce7589680638b56df"
   integrity sha512-j/O/d7GcZCyNl7/hwZAb606rzqkyvaDctLmckbxLzHvFBzTJHuGEdodATcP3yIRoDrLHkIATJuvzbFlp/ki2cQ==
 
-convict@^6.2.5:
+"convict@6.2.5":
   version "6.2.5"
   resolved "https://registry.yarnpkg.com/convict/-/convict-6.2.5.tgz#ae061e00fd55e31706f582283e671edae0cde2ef"
   integrity sha512-JtXpxqDqJ8P0UwEHwhxLzCIXQy97vlYBZR222Sbzb1q1Erex9ASrztJ29SyhWFQjod1AeFBaPzEEC8YvtZMIYg==
@@ -1262,7 +1262,7 @@ dc-polyfill@^0.1.11:
   resolved "https://registry.yarnpkg.com/dc-polyfill/-/dc-polyfill-0.1.11.tgz#3efa792147f3b5224b8a9274905b1e98fe82a856"
   integrity sha512-TyyeGcjx0YeThAI9fTFtgsvj5qd4R+aGfVmXiUhevbgzWFDr7IK4tv4YjE6jaGzLHQTchk4h7DHdr5q4WGgaZw==
 
-dd-trace@^5.100.0:
+"dd-trace@5.121.0":
   version "5.121.0"
   resolved "https://registry.yarnpkg.com/dd-trace/-/dd-trace-5.121.0.tgz#3333e6415e16ca233b4c7539b4356f02e4ba0eec"
   integrity sha512-Xu3VFLGIeGsMPkCMPkopiOmGGA9EggyoLh94I0UwJrPp+549FDF1QdfiwydTacHPxm8MdyGe+cm0JXOChLp2Vw==
@@ -1367,7 +1367,7 @@ doctrine@^3.0.0:
   dependencies:
     esutils "^2.0.2"
 
-dotenv@^16.5.0:
+"dotenv@16.6.1":
   version "16.6.1"
   resolved "https://registry.yarnpkg.com/dotenv/-/dotenv-16.6.1.tgz#773f0e69527a8315c7285d5ee73c4459d20a8020"
   integrity sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==
@@ -1798,7 +1798,7 @@ express-rate-limit@^8.2.1:
     debug "^4.4.3"
     ip-address "^10.2.0"
 
-express@^4.21.2:
+"express@4.22.2":
   version "4.22.2"
   resolved "https://registry.yarnpkg.com/express/-/express-4.22.2.tgz#c17ae0981e5efc24b22272f0e041c4662503b700"
   integrity sha512-IuL+Elrou2ZvCFHs18/CIzy2Nzvo25nZ1/D2eIZlz7c+QUayAcYoiM2BthCjs+EBHVpjYjcuLDAiCWgeIX3X1Q==
@@ -2241,7 +2241,7 @@ hasown@^2.0.4:
   dependencies:
     function-bind "^1.1.2"
 
-helmet@^8.1.0:
+"helmet@8.1.0":
   version "8.1.0"
   resolved "https://registry.yarnpkg.com/helmet/-/helmet-8.1.0.tgz#f96d23fedc89e9476ecb5198181009c804b8b38c"
   integrity sha512-jOiHyAZsmnr8LqoPGmCjYAaiuWwjAPLgY8ZX2XrmHawt99/u1y6RgrZMTeoPfpUbV96HOalYgz1qzkRbw54Pmg==
@@ -3103,7 +3103,7 @@ pino-abstract-transport@^2.0.0:
   dependencies:
     split2 "^4.0.0"
 
-pino-datadog-transport@^3.0.6:
+"pino-datadog-transport@3.0.6":
   version "3.0.6"
   resolved "https://registry.yarnpkg.com/pino-datadog-transport/-/pino-datadog-transport-3.0.6.tgz#04a87c738c5fe1aa4bbc073f43d949c1645d3827"
   integrity sha512-ZPo8k1OOmZiOuYE++UHzgsU1JSHflTmqG2hdVPh5JiRB2qTvLpRkHgRwnP9Z/nVK5XQiHcG3+I3k8JMozZ+/Ig==
@@ -3111,7 +3111,7 @@ pino-datadog-transport@^3.0.6:
     datadog-transport-common "3.0.2"
     pino-abstract-transport "^1.0.0"
 
-pino-http@^10.5.0:
+"pino-http@10.5.0":
   version "10.5.0"
   resolved "https://registry.yarnpkg.com/pino-http/-/pino-http-10.5.0.tgz#6a4fd8df93a181fc89f7f89979b8a2146aad29f2"
   integrity sha512-hD91XjgaKkSsdn8P7LaebrNzhGTdB086W3pyPihX0EzGPjq5uBJBXo4N5guqNaK6mUjg9aubMF7wDViYek9dRA==
@@ -3162,7 +3162,7 @@ pino@^9.0.0:
     sonic-boom "^4.0.1"
     thread-stream "^3.0.0"
 
-pino@^9.7.0:
+"pino@9.14.0":
   version "9.14.0"
   resolved "https://registry.yarnpkg.com/pino/-/pino-9.14.0.tgz#673d9711c2d1e64d18670c1ec05ef7ba14562556"
   integrity sha512-8OEwKp5juEvb/MjpIc4hjqfgCNysrS94RIOMXYvpYCdm/jglrKEiAYmiumbmGhCvs+IcInsphYDFwqrjr7398w==
@@ -3979,7 +3979,7 @@ typed-array-length@^1.0.7:
     possible-typed-array-names "^1.0.0"
     reflect.getprototypeof "^1.0.6"
 
-typescript@^5.8.3:
+"typescript@5.9.3":
   version "5.9.3"
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.9.3.tgz#5b4f59e15310ab17a216f5d6cf53ee476ede670f"
   integrity sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==
@@ -4053,7 +4053,7 @@ utils-merge@1.0.1:
   resolved "https://registry.yarnpkg.com/utils-merge/-/utils-merge-1.0.1.tgz#9f95710f50a267947b2ccc124741c1028427e713"
   integrity sha512-pMZTvIkT1d+TFGvDOqodOclx0QWkkgi6Tdoa8gC8ffGAAqz9pzPTZWAybbsHHoED/ztMtkv/VoYTYyShUn81hA==
 
-uuid@^11.1.0:
+"uuid@11.1.1":
   version "11.1.1"
   resolved "https://registry.yarnpkg.com/uuid/-/uuid-11.1.1.tgz#f6d81d2e1c65d00762e5e29b16c5d2d995e208ad"
   integrity sha512-vIYxrBCC/N/K+Js3qSN88go7kIfNPssr/hHCesKCQNAjmgvYS2oqr69kIufEG+O4+PfezOH4EbIeHCfFov8ZgQ==
