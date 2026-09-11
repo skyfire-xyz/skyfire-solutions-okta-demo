@@ -11,7 +11,7 @@
     "@ai-sdk/provider-utils" "5.0.10"
     "@vercel/oidc" "3.2.0"
 
-"@ai-sdk/mcp@^2.0.13":
+"@ai-sdk/mcp@2.0.13":
   version "2.0.13"
   resolved "https://registry.npmjs.org/@ai-sdk/mcp/-/mcp-2.0.13.tgz#b99dd7eb46ed1262822cd5299b3ef41dcca498ba"
   integrity sha512-hNus81WjYoQigKdjhlh/wq/CiCxW2FH7iyUgdSGyBYdQ3MZ699CuFvt/gTjwXpiF3+q4IpFFyFBT88eMHCCg2w==
@@ -20,7 +20,7 @@
     "@ai-sdk/provider-utils" "5.0.10"
     pkce-challenge "^5.0.1"
 
-"@ai-sdk/openai@^4.0.14":
+"@ai-sdk/openai@4.0.14":
   version "4.0.14"
   resolved "https://registry.npmjs.org/@ai-sdk/openai/-/openai-4.0.14.tgz#1d6a8ecb62408f62ab8f9052bfc6cf77037b36cb"
   integrity sha512-MnwhHrPOyFYvnOV5p0Iwxwuxnn0/hQbG3rXAyRAsYqfFTrzHJRU2p7BQtKX2PZWH+59iBYBFA2n4GFYC3KEK+g==
@@ -134,7 +134,7 @@
   dependencies:
     "@types/json-schema" "^7.0.15"
 
-"@eslint/eslintrc@3", "@eslint/eslintrc@^3.3.6":
+"@eslint/eslintrc@3.3.6", "@eslint/eslintrc@^3.3.6":
   version "3.3.6"
   resolved "https://registry.npmjs.org/@eslint/eslintrc/-/eslintrc-3.3.6.tgz#d22bfd6b3a7d8e1f2c0b2f2e6de111b53ec6e13e"
   integrity sha512-l2Ul9PrHsPCKcEY/ac7VgFj9D80C7S68sOKc618SyHDPK36s1XcFebXY0iTzUVn4Yq+YbwvSnDmCz9yxjX+QrA==
@@ -1144,7 +1144,7 @@
     "@tailwindcss/oxide-win32-arm64-msvc" "4.3.2"
     "@tailwindcss/oxide-win32-x64-msvc" "4.3.2"
 
-"@tailwindcss/postcss@4":
+"@tailwindcss/postcss@4.3.2":
   version "4.3.2"
   resolved "https://registry.npmjs.org/@tailwindcss/postcss/-/postcss-4.3.2.tgz#8545bc36b55a9ca20ce70ae00de5582e917ac5c4"
   integrity sha512-rjVWYCa7Ngbi5AarT6k8TkxUG3Wl1QKzHdIZVsjZSzf36Jmo2IKZt/NHRAwly8oDkbBOH0YTu+CHuf9jPxMc+g==
@@ -1227,19 +1227,19 @@
   resolved "https://registry.npmjs.org/@types/ms/-/ms-2.1.0.tgz#052aa67a48eccc4309d7f0191b7e41434b90bb78"
   integrity sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==
 
-"@types/node@20":
+"@types/node@20.19.43":
   version "20.19.43"
   resolved "https://registry.npmjs.org/@types/node/-/node-20.19.43.tgz#fcecf580ba42a0db55cf404c372c97973c376c97"
   integrity sha512-6oYBAi5ikg4Pl+kGsoYtawUMBT2zZMCvPNF7pVLnHZfd1zf38DRiWn/gT01RYCdUqkv7Fhr+C9ot4/tb+2sVvA==
   dependencies:
     undici-types "~6.21.0"
 
-"@types/react-dom@19":
+"@types/react-dom@19.2.3":
   version "19.2.3"
   resolved "https://registry.npmjs.org/@types/react-dom/-/react-dom-19.2.3.tgz#c1e305d15a52a3e508d54dca770d202cb63abf2c"
   integrity sha512-jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ==
 
-"@types/react@19":
+"@types/react@19.2.17":
   version "19.2.17"
   resolved "https://registry.npmjs.org/@types/react/-/react-19.2.17.tgz#dccac365baa0f1734ec270ff4b51c89465e8dc7f"
   integrity sha512-MXfmqaVPEVgkBT/aY0aGCkRWWtByiYQXo3xdQ8r5RzuFrPiRn8Gar2tQdXSUQ2GKV3bkXckek89V8wQBY2Q/Aw==
@@ -1628,7 +1628,7 @@ acorn@^8.15.0:
   resolved "https://registry.npmjs.org/acorn/-/acorn-8.17.0.tgz#1785adb84faf8d8add10369b93826fc2bd08f1fe"
   integrity sha512-xRQbDb9BnwDafYNn6Vwl839DYVjqXYb1XVGtWAZ1kcDc6iwAL4hg3B1dZlRiuENFeO2H53gFG3in621AdERVAg==
 
-ai@^7.0.28:
+ai@7.0.28:
   version "7.0.28"
   resolved "https://registry.npmjs.org/ai/-/ai-7.0.28.tgz#7079c4d4a5620ee4ca56f18873e3fd22adce51bf"
   integrity sha512-RtynA4e6rWH2YiMX0OJz2h2i+sdJgiItuwqmstYZAiTZ0ZkZzQ8s4KVh7tQfZuDCfzIhRTg+q1h1xirT8AClkw==
@@ -2534,7 +2534,7 @@ eslint-visitor-keys@^5.0.0:
   resolved "https://registry.npmjs.org/eslint-visitor-keys/-/eslint-visitor-keys-5.0.1.tgz#9e3c9489697824d2d4ce3a8ad12628f91e9f59be"
   integrity sha512-tD40eHxA35h0PEIZNeIjkHoDR4YjjJp34biM0mDvplBe//mB+IHCqHDGV7pxF+7MklTvighcCPPZC7ynWyjdTA==
 
-eslint@9:
+eslint@9.39.5:
   version "9.39.5"
   resolved "https://registry.npmjs.org/eslint/-/eslint-9.39.5.tgz#2a4e3c8b0f753196efae943c8ffaa8730fc6a3fa"
   integrity sha512-DgZS62aPLXKlnxILS/AYCoRvHaZeXceIzlXPkkGGzJWSow1aEk0lbTlxUSlyjC8jcaKxAdOnTDz+o1JFSBsyjw==
@@ -3435,7 +3435,7 @@ keyv@^4.5.4:
   dependencies:
     json-buffer "3.0.1"
 
-langsmith@^0.8.2:
+langsmith@0.8.2:
   version "0.8.2"
   resolved "https://registry.npmjs.org/langsmith/-/langsmith-0.8.2.tgz#2aaa88108d9e13921259bfcf2f55d90ba1062a01"
   integrity sha512-WX85yuL9vHAFIXJ4Nde/2VsjZT5o6FzX617uKDGtcgMojPe+IM6lgiZeVagv/egC79bQS9HPKVD/UPe/6zGFPg==
@@ -4921,7 +4921,7 @@ tailwind-merge@3.2.0:
   resolved "https://registry.npmjs.org/tailwind-merge/-/tailwind-merge-3.2.0.tgz#bedcf6a67a8c982da5913afcba9c854f35abb857"
   integrity sha512-FQT/OVqCD+7edmmJpsgCsY820RTD5AkBryuG5IUqR5YQZSdj5xlH5nLgH7YPths7WsLPSpSBNneJdM8aS8aeFA==
 
-tailwindcss@4, tailwindcss@4.3.2:
+tailwindcss@4.3.2:
   version "4.3.2"
   resolved "https://registry.npmjs.org/tailwindcss/-/tailwindcss-4.3.2.tgz#408ee67d767a0fef7b174674bb9c5ce136a5ace1"
   integrity sha512-WtctNNSH8A9jlMIqxzuYumOHU5uGZyRv0Q5svQl+oEPy5w84YpBxdb7MdqyiSPQge5jTJ6zFQLq0PFygdccSBA==
@@ -5318,7 +5318,7 @@ zod-to-json-schema@^3.25.1:
   resolved "https://registry.yarnpkg.com/zod-to-json-schema/-/zod-to-json-schema-3.25.2.tgz#3fa799a7badd554541472fb65843fdc460b2e5aa"
   integrity sha512-O/PgfnpT1xKSDeQYSCfRI5Gy3hPf91mKVDuYLUHZJMiDFptvP41MSnWofm8dnCm0256ZNfZIM7DSzuSMAFnjHA==
 
-"zod@^3.25 || ^4.0", zod@^4.1.8:
+zod@4.4.3, "zod@^3.25 || ^4.0":
   version "4.4.3"
   resolved "https://registry.yarnpkg.com/zod/-/zod-4.4.3.tgz#b680f172885d18bbebf21a834ea25e55a1bbf356"
   integrity sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==
