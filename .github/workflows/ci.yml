@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+jobs:
+  agent:
+    name: agent
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: data-analyst-agent
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 22
+          cache: yarn
+          cache-dependency-path: data-analyst-agent/yarn.lock
+      - run: yarn install --frozen-lockfile
+      - run: yarn build
+
+  dappier-seller-server:
+    name: dappier-seller-server
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp-servers/dappier-seller-server
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 22
+          cache: yarn
+          cache-dependency-path: mcp-servers/dappier-seller-server/yarn.lock
+      - run: yarn install --frozen-lockfile
+      - run: yarn build
+
+  reporting-server:
+    name: reporting-server
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp-servers/reporting-server
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 22
+          cache: yarn
+          cache-dependency-path: mcp-servers/reporting-server/yarn.lock
+      - run: |
+          cat > .npmrc <<'EOF'
+          @skyfire-xyz:registry=https://registry.npmjs.org
+          //registry.npmjs.org/:_authToken=${NPM_TOKEN}
+          EOF
+      - run: yarn install --frozen-lockfile
+      - run: yarn build
