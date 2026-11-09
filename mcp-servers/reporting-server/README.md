@@ -63,7 +63,7 @@ Setting up Google Apps Script is only required for the flow wherein a presentati
 
 1.  Install dependencies:
     ```bash
-    cd reporting-mcp-server
+    cd mcp-servers/reporting-server
     yarn install
     ```
 2.  Set up environment variables:
@@ -77,5 +77,5 @@ Setting up Google Apps Script is only required for the flow wherein a presentati
 ## Run the development server:
 
 ```bash
-yarn start
+yarn dev
 ```

@@ -14,7 +14,16 @@ import { MobileOutputPanel } from "@/components/agent/agent-mobile-output-panel"
 import { getAgent } from "@/app/actions";
 import { useApp } from "@/context/app-provider";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { agentTypes, examplePrompts, ExamplePrompt } from "@/lib/types";
+import {
+  agentTypes,
+  examplePrompts,
+  ExamplePrompt,
+  AgentContext,
+} from "@/lib/types";
+import {
+  formatRateLimitMessage,
+  isRateLimited,
+} from "@/lib/rate-limit-message";
 
 export function AgentSandbox() {
   const [inputs, setInputs] = useState<Record<string, string>>({
@@ -97,22 +106,23 @@ export function AgentSandbox() {
 
     try {
       const result = await getAgent(apiKey, inputs, agentContext);
-      if (typeof result === "string") {
-        setOutput(result);
+      setOutput(result);
 
-        try {
-          setParsedOutput(JSON.parse(result));
-          setAgentContext(JSON.parse(result).agentContext);
-        } catch {
-          setParsedOutput(null);
-        }
-      } else {
-        setOutput(result || "Unknown error");
-        toast.error(result || "Unknown error");
-        setParsedOutput({
-          error: true,
-          message: result || "Unknown error",
-        });
+      let parsed: Record<string, unknown> | null = null;
+      try {
+        parsed = JSON.parse(result);
+      } catch {
+        parsed = null;
+      }
+      setParsedOutput(parsed);
+
+      if (isRateLimited(parsed)) {
+        toast.error(formatRateLimitMessage(parsed));
+        return;
+      }
+
+      if (parsed?.agentContext) {
+        setAgentContext(parsed.agentContext as AgentContext);
       }
 
       setInputHistory((prev) => ({
