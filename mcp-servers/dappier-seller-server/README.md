@@ -48,5 +48,5 @@ Steps to be followed for setting up Auth0:
 ## Run the development server:
 
 ```bash
-yarn start
+yarn dev
 ```
