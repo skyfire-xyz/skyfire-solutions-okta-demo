@@ -25,7 +25,7 @@
     "build"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.31.0",
+    "@modelcontextprotocol/sdk": "1.32.0",
     "@skyfire-xyz/prettier-config-node": "3.0.0",
     "@skyfire-xyz/tsconfig": "2.0.0",
     "@types/express": "5.0.3",
@@ -34,7 +34,7 @@
     "convict": "6.2.5",
     "dd-trace": "5.131.1",
     "dotenv": "16.5.0",
-    "express": "4.21.2",
+    "express": "4.22.3",
     "helmet": "8.1.0",
     "jsonwebtoken": "9.0.2",
     "jwks-rsa": "3.2.0",
@@ -42,7 +42,7 @@
     "pino-datadog-transport": "3.0.6",
     "pino-http": "10.5.0",
     "typescript": "5.8.3",
-    "uuid": "11.1.0"
+    "uuid": "11.1.1"
   },
   "devDependencies": {
     "@skyfire-xyz/eslint-config-node": "3.2.1",
